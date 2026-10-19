@@ -42,7 +42,7 @@
     const e = {
       id: s.nextId++, kind, x: clamp(x, 0.03, 0.97), y: y ?? (kind === "firefly" ? 0.4 + rand(s) * 0.4 : 0),
       hp: 1, food: 0.6, age: 0, size: kind === "fern" ? 0.4 : 1, dir: rand(s) < 0.5 ? -1 : 1,
-      mood: "ok", why: "", glow: false, tx: x, ty: 0.5,
+      mood: "ok", why: "", glow: false, tx: rand(s), ty: 0.5,
     };
     s.ents.push(e);
     return e;
@@ -193,7 +193,7 @@
       } else if (e.kind === "springtail") {
         if (rand(s) < 3 * dt) e.dir = rand(s) < 0.5 ? -1 : 1;
         e.x = clamp(e.x + e.dir * 0.8 * dt, 0.03, 0.97);
-        if (sl.mould > 0) { const t = Math.min(sl.mould, 0.3 * dt); sl.mould -= t; e.food += t * 2; }
+        if (sl.mould > 0) { const t = Math.min(sl.mould, 0.45 * dt); sl.mould -= t; e.food += t * 1.6; }
         else if (sl.det > 0) { const t = Math.min(sl.det, 0.25 * dt); sl.det -= t; e.food += t * 1.6; }
         e.food += sl.moss * 0.3 * dt - 0.3 * dt; // nibbles the film on old moss
         s.air -= 0.15 * dt;
@@ -201,9 +201,13 @@
         if (e.food < 0.15) why.push("hungry");
         breed = e.food > 0.7 && rand(s) < 0.8 * dt;
       } else if (e.kind === "firefly") {
-        if (rand(s) < 2 * dt) { e.tx = 0.08 + rand(s) * 0.84; e.ty = 0.25 + rand(s) * 0.6; }
-        e.x += (e.tx - e.x) * 2 * dt;
-        e.y += (e.ty - e.y) * 2 * dt;
+        // rest low on the plants by day, wander the whole jar at night
+        if (rand(s) < 2 * dt || (!isNight(s) && e.ty > 0.2) || (isNight(s) && e.ty < 0.2)) {
+          e.tx = 0.08 + rand(s) * 0.84;
+          e.ty = isNight(s) ? 0.25 + rand(s) * 0.65 : 0.06 + rand(s) * 0.1;
+        }
+        e.x += (e.tx - e.x) * 6 * dt;
+        e.y += (e.ty - e.y) * 6 * dt;
         e.food += moss > 3 ? 0.3 * dt : -0.3 * dt;
         s.air -= 0.4 * dt;
         e.glow = dark;

@@ -9,9 +9,10 @@ const COL = {
 };
 
 // Jar geometry: sim x 0..1 maps across the floor, y 0..1 up from the soil.
-const JAR = { x: 170, y: 118, w: 520, h: 540, soil: 566, floor: 640 };
+const JAR = { x: 280, y: 146, w: 420, h: 446, soil: 506, floor: 580 };
 const jx = x => JAR.x + 26 + x * (JAR.w - 52);
-const jy = y => JAR.soil - 8 - y * 360;
+const AIR_H = 290; // px of open air above the soil
+const jy = y => JAR.soil - 6 - y * AIR_H;
 const inJar = (px, py) => px > JAR.x + 10 && px < JAR.x + JAR.w - 10 && py > JAR.y + 20 && py < JAR.floor;
 
 const QS = new URLSearchParams(location.search);

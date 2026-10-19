@@ -62,26 +62,26 @@ check(await evaluate(`!game.sound.context`), "silent (?mute)");
 await sleep(500);
 await shot("1-start.png");
 
-await click(225, 700);
+await click(295, 664);
 check(await evaluate(`jar.lid === true`), "Open lid button");
-await click(225, 700);
+await click(295, 664);
 check(await evaluate(`jar.lid === false`), "Close lid button");
-await click(355, 700);
+await click(425, 664);
 check(await evaluate(`jar.lamp === true`), "Lamp button");
-await click(355, 700);
+await click(425, 664);
 
 await evaluate(`jar.seeds = 40`);
 await click(870 + 156, 556);           // springtail card
 check(await evaluate(`game.scene.getScene("Jar").selected === "springtail"`), "select springtail in shop");
-await click(300, 540);
-await click(560, 540);
+await click(380, 470);
+await click(600, 470);
 check(await evaluate(`Sim.count(jar, "springtail") === 2`), "tap in jar places springtails");
 await click(870 + 312, 556 + 84);      // firefly card
-await click(330, 300);
-await click(520, 260);
+await click(420, 320);
+await click(560, 300);
 check(await evaluate(`Sim.count(jar, "firefly") === 2`), "fireflies placed");
 await click(870 + 312, 556);           // fern card
-await click(240, 560);
+await click(330, 480);
 check(await evaluate(`Sim.count(jar, "fern") === 1`), "fern placed");
 
 for (let i = 6; i < 15; i++) await evaluate(`jar.slots[${i}].moss = Math.max(jar.slots[${i}].moss, 0.6)`);
@@ -91,16 +91,16 @@ await shot("2-day.png");
 check(await evaluate(`jar.history.length > 10`), "graph history fills");
 
 // to night: fireflies glow
-await evaluate(`(() => { while (!(jar.day % 1 > 0.85)) Sim.tick(jar, 1/240); })()`);
+await evaluate(`(() => { while (!(jar.day % 1 > 0.92)) Sim.tick(jar, 1/240); })()`);
 await sleep(800);
 await shot("3-night.png");
 check(await evaluate(`jar.ents.some(e => e.kind === "firefly" && e.glow)`), "fireflies glow at night");
 
 // click a creature to see its tooltip
-const sx = await evaluate(`(() => { const e = jar.ents.find(e => e.kind === "snail"); return e && 196 + e.x * 468; })()`);
-if (sx) { await click(sx, 556); check(await evaluate(`game.scene.getScene("Jar").tip.visible`), "tap creature shows tooltip"); }
+const sx = await evaluate(`(() => { const e = jar.ents.find(e => e.kind === "snail"); return e && 306 + e.x * 368; })()`);
+if (sx) { await click(sx, 490); check(await evaluate(`game.scene.getScene("Jar").tip.visible`), "tap creature shows tooltip"); }
 await click(1000, 650);
-await click(615, 700);
+await click(685, 664);
 check(await evaluate(`game.scene.getScene("Jar").speedIdx === 1`), "speed button");
 
 check(errors.length === 0, "no console errors" + (errors.length ? ": " + errors.join(" | ") : ""));

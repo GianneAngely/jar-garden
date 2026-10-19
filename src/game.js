@@ -2,32 +2,41 @@ const DT = 1 / 240;          // sim step (days)
 const DAY_SECONDS = 60;      // real seconds per in-game day at 1x
 const SPEEDS = [1, 2, 4, 0];
 const SHOP = ["moss", "springtail", "fern", "mushroom", "snail", "firefly"];
+const SPRITES = ["snail", "snail-sad", "springtail", "firefly", "fern", "mushroom", "moss", "mould", "leaves", "lamp", "cork", "soil", "hedgehog"];
+const ICONS = ["spray", "bulb", "lid", "drop", "seed", "sprout", "air", "heart"];
+
+// creature sprite: display scale + origin. Ground creatures stand on the soil (origin bottom).
+const LOOK = {
+  snail: { s: 0.3, oy: 1 }, springtail: { s: 0.3, oy: 1 }, firefly: { s: 0.3, oy: 0.5 },
+  fern: { s: 0.55, oy: 0.97 }, mushroom: { s: 0.36, oy: 0.98 },
+};
+const WHY_ICON = {
+  "too dry": "drop", "stuffy air": "air", "can't breathe": "air", "hungry": "leaves", "nothing to eat": "leaves",
+  "too dim": "bulb", "needs more moss": "sprout", "lamp too bright": "bulb",
+};
 
 const sunAt = day => { const f = day % 1; return f > 0.25 && f < 0.75 ? Math.sin(Math.PI * (f - 0.25) / 0.5) : 0; };
-const lerpColor = (a, b, t) => {
-  const ca = Phaser.Display.Color.IntegerToColor(a), cb = Phaser.Display.Color.IntegerToColor(b);
-  const c = Phaser.Display.Color.Interpolate.ColorWithColor(ca, cb, 100, Math.round(t * 100));
-  return Phaser.Display.Color.GetColor(c.r, c.g, c.b);
-};
 const clock = day => {
   const m = Math.floor((day % 1) * 24 * 60), h = Math.floor(m / 60);
   return `${(h + 11) % 12 + 1}:${String(m % 60).padStart(2, "0")} ${h < 12 ? "AM" : "PM"}`;
 };
+const hash = (a, b) => { const x = Math.sin(a * 127.1 + b * 311.7) * 43758.5453; return x - Math.floor(x); };
 
 function label(scene, x, y, str, size = 22, color = COL.ink, origin = 0) {
   return scene.add.text(x, y, str, { fontFamily: FONT, fontSize: size + "px", color }).setOrigin(origin, 0.5);
 }
 
-function button(scene, x, y, w, h, str, onTap) {
+function button(scene, x, y, w, h, str, icon, onTap) {
   const c = scene.add.container(x, y);
   const bg = scene.add.graphics();
-  const t = label(scene, 0, 0, str, 20, COL.ink, 0.5);
+  const t = label(scene, icon ? 14 : 0, 0, str, 19, COL.ink, 0.5);
   const paint = on => {
     bg.clear().fillStyle(COL.inkHex, 0.2).fillRoundedRect(-w / 2, -h / 2 + 4, w, h, 14);
     bg.fillStyle(on ? 0xffe6a8 : COL.card).lineStyle(3, COL.inkHex).fillRoundedRect(-w / 2, -h / 2, w, h, 14).strokeRoundedRect(-w / 2, -h / 2, w, h, 14);
   };
   paint(false);
   c.add([bg, t]);
+  if (icon) c.add(scene.add.image(-w / 2 + 22, 0, "icon-" + icon).setScale(26 / 96));
   c.setSize(w, h).setInteractive({ useHandCursor: true })
     .on("pointerdown", () => c.setScale(0.95))
     .on("pointerout", () => c.setScale(1))
@@ -39,6 +48,12 @@ function button(scene, x, y, w, h, str, onTap) {
 
 class Boot extends Phaser.Scene {
   constructor() { super("Boot"); }
+  preload() {
+    for (const k of SPRITES) this.load.image(k, `assets/${k}.webp`);
+    for (const k of ICONS) this.load.image("icon-" + k, `assets/icon-${k}.webp`);
+    this.load.image("bg-day", "assets/bg-day.jpg");
+    this.load.image("bg-night", "assets/bg-night.jpg");
+  }
   create() {
     Audio.apply(this.game);
     // soft radial glow, used for fireflies and the lamp (works in Canvas and WebGL)
@@ -62,28 +77,40 @@ class Jar extends Phaser.Scene {
     this.selected = null;
     this.views = new Map();
 
-    this.sky = this.add.graphics();
-    this.room = this.add.graphics();
-    this.drawRoom();
+    this.add.image(0, 0, "bg-day").setOrigin(0).setDisplaySize(W, H);
+    this.bgNight = this.add.image(0, 0, "bg-night").setOrigin(0).setDisplaySize(W, H).setAlpha(0);
     this.jarBack = this.add.graphics();
-    this.soil = this.add.graphics();
+    this.drawJarBack();
+
+    // soil band, clipped to the jar's rounded bottom
+    const mask = this.make.graphics({ add: false }).fillRoundedRect(JAR.x + 3, JAR.y + 40, JAR.w - 6, JAR.h - 43, 44);
+    const soilImg = this.add.image(JAR.x + JAR.w / 2, JAR.soil - 4, "soil").setOrigin(0.5, 0);
+    soilImg.setDisplaySize(JAR.w + 30, JAR.y + JAR.h - JAR.soil + 10).setMask(mask.createGeometryMask());
+
+    // per-slot soil life: leftovers, moss, mould (pooled images, scaled each frame)
+    this.slotViews = this.s.slots.map((_, i) => {
+      const x = jx(Sim.slotX(i)), flip = hash(i, 7) < 0.5;
+      return {
+        leaves: this.add.image(x, JAR.soil + 3, "leaves").setOrigin(0.5, 1).setFlipX(flip).setVisible(false),
+        moss: this.add.image(x, JAR.soil + 5, "moss").setOrigin(0.5, 1).setFlipX(flip).setVisible(false),
+        mould: this.add.image(x, JAR.soil + 4, "mould").setOrigin(0.5, 1).setFlipX(!flip).setVisible(false),
+      };
+    });
     this.ents = this.add.layer();
     this.night = this.add.rectangle(0, 0, W, H, COL.night, 0).setOrigin(0);
-    this.lampGlow = this.add.image(430, 60, "glow").setScale(5.5).setTint(0xffd27a).setBlendMode(Phaser.BlendModes.ADD).setAlpha(0);
+    this.lamp = this.add.image(JAR.x - 10, 0, "lamp").setOrigin(0.5, 0).setScale(0.5);
+    this.lampGlow = this.add.image(this.lamp.x, 122, "glow").setScale(6).setTint(0xffd27a).setBlendMode(Phaser.BlendModes.ADD).setAlpha(0);
     this.glows = this.add.layer();
     this.jarFront = this.add.graphics();
-    this.drawJar();
-    this.lid = this.add.container(JAR.x + JAR.w / 2, JAR.y - 6);
-    const lg = this.add.graphics();
-    lg.fillStyle(0xd9a874).lineStyle(3, COL.inkHex).fillRoundedRect(-185, -22, 370, 34, 10).strokeRoundedRect(-185, -22, 370, 34, 10);
-    lg.fillStyle(0xc28f5c).fillCircle(-120, -6, 3).fillCircle(-40, 0, 2.5).fillCircle(60, -8, 3).fillCircle(140, -2, 2);
-    this.lid.add(lg);
+    this.drawJarFront();
+    this.lid = this.add.image(JAR.x + JAR.w / 2, JAR.y + 22, "cork").setOrigin(0.5, 1).setDisplaySize(JAR.w - 112, 46);
+    this.lidHome = { x: this.lid.x, y: this.lid.y };
 
     this.buildToolbar();
     this.buildPanel();
-    this.toast = this.add.container(JAR.x + JAR.w / 2, 205).setDepth(50).setAlpha(0);
+    this.toast = this.add.container(JAR.x + JAR.w / 2, 240).setDepth(50).setAlpha(0);
     this.toastBg = this.add.graphics();
-    this.toastText = label(this, 0, 0, "", 20, COL.ink, 0.5);
+    this.toastText = label(this, 0, 0, "", 19, COL.ink, 0.5);
     this.toast.add([this.toastBg, this.toastText]);
     this.tip = this.add.container(0, 0).setDepth(60).setVisible(false);
     this.tipBg = this.add.graphics();
@@ -96,37 +123,37 @@ class Jar extends Phaser.Scene {
     window.STATE = "jar";
   }
 
-  // Static scenery ---------------------------------------------------------
-  drawRoom() {
-    const g = this.room;
-    g.fillStyle(0xfff8ef).lineStyle(6, COL.inkHex);
-    g.strokeRoundedRect(110, 24, 640, 560, 18);              // window frame
-    g.lineStyle(4, COL.inkHex).lineBetween(430, 24, 430, 584).lineBetween(110, 300, 750, 300);
-    g.fillStyle(0xc99a6b).fillRect(60, 652, 680, 22);         // shelf
-    g.fillStyle(0xa97b50).fillRect(60, 674, 680, 8);
-    g.lineStyle(3, COL.inkHex).strokeRect(60, 652, 680, 30);
-    g.lineStyle(2, COL.inkHex).lineBetween(430, 0, 430, 22);  // lamp cord
-    g.fillStyle(0xf7a8b8).lineStyle(3, COL.inkHex);
-    g.beginPath(); g.moveTo(400, 46); g.lineTo(460, 46); g.lineTo(448, 22); g.lineTo(412, 22); g.closePath(); g.fillPath(); g.strokePath();
+  // Jar glass: drawn in code (Flow kept copying its reference into glass), styled like the art
+  drawJarBack() {
+    const { x, y, w, h } = JAR;
+    this.jarBack.fillStyle(0xeef8f6, 0.32).fillRoundedRect(x, y + 40, w, h - 40, 46).fillRect(x + 60, y, w - 120, 50);
   }
 
-  drawJar() {
-    const b = this.jarBack, f = this.jarFront, { x, y, w, h } = JAR;
-    b.clear().fillStyle(COL.glass, 0.35).fillRoundedRect(x, y + 40, w, h - 40, 46).fillRect(x + 70, y, w - 140, 50);
-    f.clear().lineStyle(5, COL.inkHex).strokeRoundedRect(x, y + 40, w, h - 40, 46);
-    f.fillStyle(COL.glass, 1).fillRect(x + 72, y + 36, w - 144, 10);
-    f.lineStyle(5, COL.inkHex).lineBetween(x + 70, y, x + 70, y + 42).lineBetween(x + w - 70, y, x + w - 70, y + 42);
-    f.lineStyle(10, 0xffffff, 0.55).lineBetween(x + 30, y + 110, x + 30, y + 330);
-    f.lineStyle(6, 0xffffff, 0.45).lineBetween(x + 30, y + 360, x + 30, y + 400);
+  drawJarFront() {
+    const f = this.jarFront, { x, y, w, h } = JAR, ink = 0x7a5a44;
+    // body outline, open between the neck walls
+    const r = 46, top = y + 40, bot = y + h, R = x + w;
+    f.lineStyle(4, ink).beginPath();
+    f.moveTo(x + 60, top); f.lineTo(x + r, top);
+    f.arc(x + r, top + r, r, -Math.PI / 2, Math.PI, true); f.lineTo(x, bot - r);
+    f.arc(x + r, bot - r, r, Math.PI, Math.PI / 2, true); f.lineTo(R - r, bot);
+    f.arc(R - r, bot - r, r, Math.PI / 2, 0, true); f.lineTo(R, top + r);
+    f.arc(R - r, top + r, r, 0, -Math.PI / 2, true); f.lineTo(R - 60, top);
+    f.strokePath();
+    f.lineStyle(4, ink).lineBetween(x + 60, y, x + 60, y + 42).lineBetween(x + w - 60, y, x + w - 60, y + 42);
+    f.lineStyle(3, ink).strokeRoundedRect(x + 52, y - 6, w - 104, 14, 6);
+    f.lineStyle(9, 0xffffff, 0.4).lineBetween(x + 26, y + 100, x + 26, y + 270);
+    f.lineStyle(5, 0xffffff, 0.3).lineBetween(x + 26, y + 292, x + 26, y + 322);
+    f.lineStyle(4, 0xffffff, 0.3).lineBetween(x + w - 30, y + 120, x + w - 30, y + 170);
   }
 
   // UI -----------------------------------------------------------------------
   buildToolbar() {
-    const y = 700;
-    this.lidBtn = button(this, 225, y, 120, 36, "Open lid", () => this.toggleLid());
-    this.lampBtn = button(this, 355, y, 120, 36, "Lamp off", () => this.toggleLamp());
-    this.mistBtn = button(this, 485, y, 120, 36, "Mist 💦", () => { Sim.mist(this.s); this.say("Pssst! +10 humidity"); });
-    this.speedBtn = button(this, 615, y, 120, 36, "▶ 1x", () => this.cycleSpeed());
+    const y = 664, cx = JAR.x + JAR.w / 2;
+    this.lidBtn = button(this, cx - 195, y, 122, 40, "Open lid", "lid", () => this.toggleLid());
+    this.lampBtn = button(this, cx - 65, y, 122, 40, "Lamp off", "bulb", () => this.toggleLamp());
+    this.mistBtn = button(this, cx + 65, y, 122, 40, "Mist", "spray", () => { Sim.mist(this.s); this.puff(); this.say("Pssst! +10 humidity"); });
+    this.speedBtn = button(this, cx + 195, y, 122, 40, "▶ 1x", null, () => this.cycleSpeed());
   }
 
   buildPanel() {
@@ -134,7 +161,8 @@ class Jar extends Phaser.Scene {
     g.fillStyle(COL.inkHex, 0.18).fillRoundedRect(770, 26, 490, 676, 22);
     g.fillStyle(COL.card).lineStyle(4, COL.inkHex).fillRoundedRect(766, 20, 490, 676, 22).strokeRoundedRect(766, 20, 490, 676, 22);
     this.dayText = label(this, 792, 56, "", 28);
-    this.seedText = label(this, 1150, 56, "", 26, COL.ink, 1);
+    this.add.image(1102, 56, "icon-seed").setScale(30 / 96);
+    this.seedText = label(this, 1122, 56, "", 26, COL.ink, 0);
     this.muteBtn = label(this, 1226, 56, Audio.muted ? "🔇" : "🔊", 24, COL.ink, 0.5).setInteractive({ useHandCursor: true })
       .on("pointerup", () => this.muteBtn.setText(Audio.toggle(this.game) ? "🔇" : "🔊"));
 
@@ -163,12 +191,11 @@ class Jar extends Phaser.Scene {
       const cx = 870 + (i % 3) * 156, cy = 556 + Math.floor(i / 3) * 84;
       const c = this.add.container(cx, cy);
       const bg = this.add.graphics();
-      const icon = this.add.graphics().setPosition(-44, kind === "fern" ? 22 : 14).setScale(kind === "fern" ? 0.42 : kind === "moss" ? 1 : 1.1);
-      if (kind === "moss") icon.fillStyle(COL.moss[1]).lineStyle(2, COL.inkHex).fillEllipse(0, -6, 34, 18).strokeEllipse(0, -6, 34, 18);
-      else DRAW[kind](icon, "happy");
-      const name = label(this, -18, -12, Sim.KINDS[kind].name, 18);
+      const tex = this.textures.get(kind).getSourceImage();
+      const icon = this.add.image(-44, 2, kind).setScale(Math.min(56 / tex.width, 54 / tex.height));
+      const name = label(this, -12, -12, Sim.KINDS[kind].name, 18);
       const n = Sim.KINDS[kind].cost;
-      const cost = label(this, -18, 14, n + (n === 1 ? " seed" : " seeds"), 15, "#9a7a66");
+      const cost = label(this, -12, 14, n + (n === 1 ? " seed" : " seeds"), 15, "#9a7a66");
       c.add([bg, icon, name, cost]);
       c.setSize(146, 74).setInteractive({ useHandCursor: true }).on("pointerup", () => this.select(this.selected === kind ? null : kind));
       c.paint = () => {
@@ -186,19 +213,27 @@ class Jar extends Phaser.Scene {
   }
 
   say(str) {
-    this.toastText.setText(str).setWordWrapWidth(440).setAlign("center");
-    const w = Math.min(470, this.toastText.width + 30), h = this.toastText.height + 16;
+    this.toastText.setText(str).setWordWrapWidth(380).setAlign("center");
+    const w = Math.min(410, this.toastText.width + 30), h = this.toastText.height + 16;
     this.toastBg.clear().fillStyle(0xfffdf8, 0.95).lineStyle(2, COL.inkHex).fillRoundedRect(-w / 2, -h / 2, w, h, 14).strokeRoundedRect(-w / 2, -h / 2, w, h, 14);
     this.tweens.killTweensOf(this.toast);
     this.toast.setAlpha(str ? 1 : 0);
     if (str && !this.selected) this.tweens.add({ targets: this.toast, alpha: 0, delay: 2200, duration: 500 });
   }
 
+  puff() {
+    for (let k = 0; k < 10; k++) {
+      const d = this.add.image(JAR.x + 60 + Math.random() * (JAR.w - 120), JAR.y + 70, "icon-drop").setScale(0.12).setAlpha(0.9).setDepth(40);
+      this.tweens.add({ targets: d, y: JAR.y + 140 + Math.random() * 220, alpha: 0, duration: 900 + Math.random() * 500, onComplete: () => d.destroy() });
+    }
+  }
+
   toggleLid() {
     Sim.setLid(this.s, !this.s.lid);
     this.lidBtn.setLabel(this.s.lid ? "Close lid" : "Open lid");
     this.lidBtn.setOn(this.s.lid);
-    this.tweens.add({ targets: this.lid, x: JAR.x + JAR.w / 2 + (this.s.lid ? 150 : 0), y: JAR.y - 6 - (this.s.lid ? 46 : 0), angle: this.s.lid ? 12 : 0, duration: 350, ease: "Back.Out" });
+    const { x, y } = this.lidHome;
+    this.tweens.add({ targets: this.lid, x: x + (this.s.lid ? 175 : 0), y: y - (this.s.lid ? 40 : 0), angle: this.s.lid ? 14 : 0, duration: 380, ease: "Back.Out" });
   }
 
   toggleLamp() {
@@ -218,7 +253,7 @@ class Jar extends Phaser.Scene {
     if (!inJar(p.x, p.y)) { this.tip.setVisible(false); return; }
     if (!this.selected) return;
     const x = Phaser.Math.Clamp((p.x - JAR.x - 26) / (JAR.w - 52), 0, 1);
-    const y = Phaser.Math.Clamp((JAR.soil - 8 - p.y) / 360, 0.25, 0.85);
+    const y = Phaser.Math.Clamp((JAR.soil - 6 - p.y) / AIR_H, 0.25, 0.85);
     const r = Sim.place(this.s, this.selected, x, y);
     if (r.ok) { Audio.blip(this, 520); this.say(`${Sim.KINDS[this.selected].name} added!`); this.selected = this.s.seeds >= Sim.KINDS[this.selected].cost ? this.selected : null; }
     else this.say("Can't: " + r.why);
@@ -230,7 +265,7 @@ class Jar extends Phaser.Scene {
     this.tipText.setText(str);
     const w = this.tipText.width + 24;
     this.tipBg.clear().fillStyle(0xfffdf8).lineStyle(2, COL.inkHex).fillRoundedRect(-w / 2, -16, w, 32, 10).strokeRoundedRect(-w / 2, -16, w, 32, 10);
-    this.tip.setPosition(x, y - 70).setVisible(true);
+    this.tip.setPosition(x, y - (e.kind === "fern" ? 140 : 80)).setVisible(true);
     this.tipFor = e.id;
   }
 
@@ -241,38 +276,26 @@ class Jar extends Phaser.Scene {
     for (let n = 0; this.acc >= DT && n < 60; n++) { Sim.tick(this.s, DT); this.acc -= DT; }
     const s = this.s;
     const sun = sunAt(s.day);
+    const dusk = Phaser.Math.Clamp(1 - sun * 2.2, 0, 1);   // night art fades in only near sunset
+    this.bgNight.setAlpha(dusk);
+    this.night.setFillStyle(COL.night, dusk * 0.38);
+    this.lampGlow.setAlpha(s.lamp ? 0.6 : 0);
 
-    this.sky.clear().fillStyle(lerpColor(0x2b3566, 0xbfe3f2, sun)).fillRoundedRect(112, 26, 636, 556, 16);
-    if (sun > 0 && sun < 0.35) this.sky.fillStyle(0xf7b38a, 0.35 * (1 - sun / 0.35)).fillRect(112, 300, 636, 282);
-    if (!sun) for (let i = 0; i < 14; i++) this.sky.fillStyle(0xfff3b0, 0.6 + 0.4 * Math.sin(time / 600 + i)).fillCircle(130 + hash(i, 1) * 600, 40 + hash(i, 2) * 240, 1.5 + hash(i, 3) * 1.5);
-    this.night.setFillStyle(COL.night, (1 - sun) * 0.45);
-    this.lampGlow.setAlpha(s.lamp ? 0.55 : 0);
-
-    this.drawSoil();
+    this.drawSoil(time);
     this.syncCreatures(time);
-    this.drawPanel(sun);
+    this.drawPanel();
   }
 
-  drawSoil() {
-    const g = this.soil, { x, w, soil, floor } = JAR;
-    g.clear();
-    g.fillStyle(COL.soil).fillRoundedRect(x + 4, soil, w - 8, floor - soil + 14, { tl: 0, tr: 0, bl: 40, br: 40 });
-    g.fillStyle(COL.soilDark).fillRoundedRect(x + 4, floor - 18, w - 8, 32, { tl: 0, tr: 0, bl: 40, br: 40 });
-    for (let k = 0; k < 26; k++) g.fillStyle(0xa98468).fillCircle(x + 30 + hash(k, 9) * (w - 60), soil + 14 + hash(k, 4) * 50, 3 + hash(k, 5) * 3);
-    const sw = (w - 52) / Sim.N;
+  drawSoil(time) {
+    const sw = (JAR.w - 52) / Sim.N;
     this.s.slots.forEach((sl, i) => {
-      const cx = jx(Sim.slotX(i));
-      for (let k = 0; k < Math.round(sl.det * 7); k++) g.fillStyle(COL.det).fillEllipse(cx - sw / 2 + hash(i, k) * sw, soil + 2 + hash(k, i) * 6, 6, 3);
-      if (sl.moss > 0.01) {
-        const col = sl.moss < 0.35 ? COL.moss[0] : sl.moss < 0.7 ? COL.moss[1] : COL.moss[2];
-        const hgt = 6 + sl.moss * 22;
-        g.fillStyle(col).lineStyle(2, COL.inkHex, 0.6);
-        g.fillEllipse(cx, soil, sw + 10, hgt).strokeEllipse(cx, soil, sw + 10, hgt);
-        g.fillStyle(lerpColor(col, 0xffffff, 0.25)).fillCircle(cx - 3, soil - hgt * 0.25, hgt * 0.15);
-      }
-      for (let k = 0; k < Math.round(sl.mould * 9); k++) {
-        g.fillStyle(COL.mould).lineStyle(1, 0x9f978a).fillCircle(cx - sw / 2 + hash(i, k + 20) * sw, soil - 4 - hash(k + 20, i) * 14, 3 + hash(i * 3, k) * 3).strokeCircle(cx - sw / 2 + hash(i, k + 20) * sw, soil - 4 - hash(k + 20, i) * 14, 3 + hash(i * 3, k) * 3);
-      }
+      const v = this.slotViews[i];
+      v.leaves.setVisible(sl.det > 0.05).setScale(0.12 + sl.det * 0.16);
+      const m = sl.moss;
+      v.moss.setVisible(m > 0.01);
+      if (m > 0.01) v.moss.setScale((sw * (1.6 + m * 1.4)) / 220, 0.12 + m * 0.3 + Math.sin(time / 900 + i) * 0.006).setAlpha(0.75 + m * 0.25);
+      v.mould.setVisible(sl.mould > 0.02);
+      if (sl.mould > 0.02) v.mould.setScale((sw * (1.2 + sl.mould * 2.2)) / 200, 0.12 + sl.mould * 0.32);
     });
   }
 
@@ -281,32 +304,54 @@ class Jar extends Phaser.Scene {
     for (const e of this.s.ents) {
       alive.add(e.id);
       let v = this.views.get(e.id);
+      const look = LOOK[e.kind];
       if (!v) {
-        const c = this.add.container(jx(e.x), e.kind === "firefly" ? jy(e.y) : JAR.soil);
-        const g = this.add.graphics();
-        const glow = e.kind === "firefly" ? this.add.image(0, 6, "glow").setScale(0.7).setTint(0xffe680).setBlendMode(Phaser.BlendModes.ADD).setAlpha(0) : null;
-        const bubble = label(this, 0, -46, "", 18, COL.ink, 0.5).setVisible(false);
+        const c = this.add.container(jx(e.x), e.kind === "firefly" ? jy(e.y) : JAR.soil + 2);
+        const img = this.add.image(0, 0, e.kind).setOrigin(0.5, look.oy).setScale(look.s);
+        const glow = e.kind === "firefly" ? this.add.image(-12, 6, "glow").setScale(0.75).setTint(0xffe680).setBlendMode(Phaser.BlendModes.ADD).setAlpha(0) : null;
+        const bubble = this.add.container(0, 0).setVisible(false);
+        const bubbleBg = this.add.graphics().fillStyle(0xfffdf8, 0.95).lineStyle(2, COL.inkHex).fillCircle(0, 0, 15).strokeCircle(0, 0, 15);
+        const bubbleIcon = this.add.image(0, 0, "icon-drop");
+        bubble.add([bubbleBg, bubbleIcon]);
         if (glow) c.add(glow);
-        c.add([g, bubble]);
-        c.setSize(e.kind === "fern" ? 90 : 44, e.kind === "fern" ? 90 : 44).setInteractive({ useHandCursor: true })
-          .on("pointerup", () => this.showTip(e, c.x, c.y));
+        c.add([img, bubble]);
+        const big = e.kind === "fern" ? 120 : 50;
+        c.setSize(big, big).setInteractive({ useHandCursor: true }).on("pointerup", () => this.showTip(e, c.x, c.y));
+        c.input.hitArea.y = look.oy === 1 || e.kind === "fern" ? -big / 2 : 0;
         (e.kind === "firefly" ? this.glows : this.ents).add(c);
-        c.setScale(0); this.tweens.add({ targets: c, scale: 1, duration: 300, ease: "Back.Out" });
-        v = { c, g, glow, bubble, mood: null };
+        c.setScale(0); this.tweens.add({ targets: c, scale: 1, duration: 320, ease: "Back.Out" });
+        v = { c, img, glow, bubble, bubbleIcon, why: null };
         this.views.set(e.id, v);
       }
-      if (v.mood !== e.mood) { v.g.clear(); DRAW[e.kind](v.g, e.mood); v.mood = e.mood; }
       const tx = jx(e.x);
-      let ty = e.kind === "firefly" ? jy(e.y) + Math.sin(time / 300 + e.id) * 6 : JAR.soil - 2;
+      let ty = e.kind === "firefly" ? jy(e.y) + Math.sin(time / 300 + e.id) * 6 : JAR.soil + 2;
       if (e.kind === "springtail") ty -= Math.abs(Math.sin(time / 160 + e.id)) * 12;
       v.c.x += (tx - v.c.x) * 0.15;
       v.c.y += (ty - v.c.y) * 0.3;
-      if (e.kind === "snail" || e.kind === "springtail") v.g.scaleX = e.dir;
-      if (e.kind === "fern") v.g.setScale(0.5 + e.size * 0.6);
-      if (e.kind === "snail") v.g.scaleY = 1 + Math.sin(time / 250 + e.id) * 0.03;
-      if (v.glow) v.glow.setAlpha(e.glow ? 0.7 + 0.3 * Math.sin(time / 280 + e.id * 2) : 0);
-      const icon = e.why ? MOOD_ICON[e.why] || "❗" : "";
-      v.bubble.setText(icon).setVisible(!!icon).setY((e.kind === "fern" ? -100 : -48) + Math.sin(time / 400) * 3);
+
+      const sad = e.mood === "sad";
+      if (e.kind === "snail") v.img.setTexture(sad ? "snail-sad" : "snail");
+      let sx = look.s, sy = look.s, rot = 0;
+      if (e.kind === "snail") sy *= 1 + Math.sin(time / 260 + e.id) * 0.035;
+      if (e.kind === "firefly") sy *= 1 + Math.sin(time / 60 + e.id) * 0.05;
+      if (e.kind === "fern") { sx *= 0.45 + e.size * 0.55; sy = sx; rot = Math.sin(time / 1300 + e.id) * 0.04; }
+      if (e.kind === "mushroom") sy *= 1 + Math.sin(time / 700 + e.id) * 0.03;
+      if (sad && e.kind !== "snail") { sy *= 0.9; rot += 0.06; }
+      const dir = e.kind === "snail" || e.kind === "springtail" ? e.dir : e.kind === "firefly" ? (e.tx > e.x ? 1 : -1) : 1;
+      v.img.setScale(sx * dir, sy).setRotation(rot);
+      if (v.glow) { v.glow.x = -12 * dir; v.glow.setAlpha(e.glow ? 0.75 + 0.25 * Math.sin(time / 280 + e.id * 2) : 0); }
+
+      const icon = e.why ? WHY_ICON[e.why] || "drop" : "";
+      if (icon !== v.why) {
+        v.why = icon;
+        v.bubble.setVisible(!!icon);
+        if (icon) {
+          const key = icon === "leaves" ? "leaves" : "icon-" + icon;
+          const src = this.textures.get(key).getSourceImage();
+          v.bubbleIcon.setTexture(key).setScale(20 / Math.max(src.width, src.height));
+        }
+      }
+      if (icon) v.bubble.setY((e.kind === "fern" ? -125 : e.kind === "firefly" ? -34 : -66) + Math.sin(time / 400) * 3);
       if (this.tipFor === e.id && this.tip.visible) this.showTip(e, v.c.x, v.c.y);
     }
     for (const [id, v] of this.views) {
@@ -318,10 +363,10 @@ class Jar extends Phaser.Scene {
     }
   }
 
-  drawPanel(sun) {
+  drawPanel() {
     const s = this.s;
     this.dayText.setText(`Day ${Math.floor(s.day) + 1} · ${clock(s.day)}`);
-    this.seedText.setText(`🌰 ${s.seeds}`);
+    this.seedText.setText(String(s.seeds));
     const vals = { hum: s.hum, air: s.air, light: Sim.light(s) * 100, mould: (Sim.mouldTotal(s) / Sim.N) * 100 };
     const b = this.bars.clear();
     this.barDefs.forEach((d, i) => {

@@ -13,8 +13,8 @@ Out of the plan: Slapjam #2, Oct 29 23:00 to Oct 31 23:00 WITA.
 ## Milestones
 | # | Dates (WITA) | Done when |
 |---|---|---|
-| M1 sim core | Oct 19–21 | Pure `sim.js` (6 species, humidity/air/light/detritus/mould) + node balance tests; placeholder art jar you can play: place creatures, lid, lamp, mist, speed, stats + graphs. |
-| M2 art + wow | Oct 22–24 | Flow art (Cake Tower style, ~30–40 gens, one per generation on #00FF00) keyed into sprites; creature idle/walk/blink; day/night tint; firefly night glow. |
+| M1 sim core (done Oct 19) | Oct 19–21 | Pure `sim.js` (6 species, humidity/air/light/detritus/mould) + node balance tests; placeholder art jar you can play: place creatures, lid, lamp, mist, speed, stats + graphs. |
+| M2 art + wow (done Oct 19) | Oct 22–24 | Flow art (Cake Tower style, ~30–40 gens, one per generation on #00FF00) keyed into sprites; creature idle/walk/blink; day/night tint; firefly night glow. |
 | M3 game | Oct 25–28 | Neighbour requests (goal mode, 6), seed shop tuning, 30 s onboarding, title screen, end-of-request postcard. |
 | — | Oct 29–31 | Slapjam (other project). |
 | M4 sound + polish | Nov 1–2 | CC0 music/SFX, juice, balance pass. **Playable complete build by Nov 2 (H-3).** |
@@ -36,3 +36,8 @@ Soil: 20 slots, each with moss (0–1), mould (0–1), detritus (0–1).
 - Lid open: humidity drifts to room (40), air refreshes. Closed: humidity stays, air only from plants.
 - Mist: +humidity.
 Seeds: earned each day from happy creatures and species variety; spent in the shop.
+
+## Art log
+- Flow /u/2 project "Oct 19 - 15:05", 20 generations (x2 images). Style reference: Angel's own Cake Tower art (bg-landscape, tier-pink), uploaded. Raw renders in `art/flow/`, cut into `assets/` by `tools/make_sprites.py`.
+- The glass jar stays code-drawn: Flow copied the reference shop into transparent glass every time.
+- Unused for now: hedgehog neighbour (M3 requests), key art draft (M5 itch cover, `docs/m2/keyart-draft.jpg`).
