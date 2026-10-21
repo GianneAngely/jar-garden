@@ -1,7 +1,7 @@
 // Silent GIF recorder. Stops Phaser's own loop and steps the game frame by frame, so the GIF is smooth
 // and the same every run no matter how slow headless Chrome is. A drawn cursor shows every click.
 // usage: node tools/record.mjs <scenario.mjs> <out.gif> [--fps 20] [--width 800] [--query "seed=7"]
-// A scenario exports `default async function (rec)` using rec.wait(sec), rec.click(gx, gy), rec.eval(js).
+// A scenario exports `default async function (rec)` using rec.wait(sec), rec.until(js), rec.click(gx, gy), rec.eval(js).
 import { execFileSync } from "node:child_process";
 import { mkdtempSync, rmSync, writeFileSync, mkdirSync } from "node:fs";
 import { tmpdir } from "node:os";
@@ -27,6 +27,8 @@ const step = async () => { await cdp.evaluate(`(() => { __t += ${D}; game.step(_
 const rec = {
   eval: js => cdp.evaluate(js),
   async wait(sec) { for (let i = 0; i < Math.round(sec * FPS); i++) await step(); },
+  // step frames until a page condition holds (or maxSec passes)
+  async until(js, maxSec = 30) { for (let i = 0; i < maxSec * FPS && !(await cdp.evaluate(js)); i++) await step(); },
   // glide the drawn cursor to (gx, gy) in game coordinates, then press
   async click(gx, gy, glide = 0.4) {
     const from = (await cdp.evaluate(`[__cur.gx, __cur.gy]`)) || [gx, gy];

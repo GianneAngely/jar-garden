@@ -34,7 +34,8 @@
       goal(s) {
         const ff = s.ents.find(e => e.kind === "firefly");
         const ok = !!ff && ff.glow && ff.mood !== "sad" && !s.lamp;
-        return { ok, p: ok ? 1 : ff ? 0.5 : 0, text: ok ? "Glowing!" : ff ? "Wait for the dark" : "Add a firefly", why: ff && ff.mood === "sad" ? `${nameOf(ff)}: ${ff.why}` : "" };
+        const text = ok ? "Glowing!" : !ff ? "Add a firefly" : !night(s) ? "Wait for the dark" : s.lamp ? "Turn the lamp off" : "Almost...";
+        return { ok, p: ok ? 1 : ff ? 0.5 : 0, text, why: ff && ff.mood === "sad" ? `${nameOf(ff)}: ${ff.why}` : "" };
       },
     },
     {

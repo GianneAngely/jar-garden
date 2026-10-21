@@ -120,6 +120,7 @@ class Jar extends Phaser.Scene {
     this.tip.add([this.tipBg, this.tipText]);
 
     this.card = new NoteCard(this);
+    this.coach = new Coach(this);
     this.thanks = [];
     this.syncButtons();
     this.input.on("pointerdown", (p, over) => this.tapJar(p, over));
@@ -155,16 +156,19 @@ class Jar extends Phaser.Scene {
   // UI -----------------------------------------------------------------------
   buildToolbar() {
     const y = 664, cx = JAR.x + JAR.w / 2;
-    this.lidBtn = button(this, cx - 195, y, 122, 40, "Open lid", "lid", () => this.toggleLid());
-    this.lampBtn = button(this, cx - 65, y, 122, 40, "Lamp off", "bulb", () => this.toggleLamp());
-    this.mistBtn = button(this, cx + 65, y, 122, 40, "Mist", "spray", () => { Sim.mist(this.s); this.puff(); this.say("Pssst! +10 humidity"); });
-    this.speedBtn = button(this, cx + 195, y, 122, 40, "▶ 1x", null, () => this.cycleSpeed());
+    // during the onboarding only the control the coach points at responds
+    const live = (key, fn) => () => (this.coach.allows(key) ? fn() : this.coach.nudge());
+    this.lidBtn = button(this, cx - 195, y, 122, 40, "Open lid", "lid", live("lid", () => this.toggleLid()));
+    this.lampBtn = button(this, cx - 65, y, 122, 40, "Lamp off", "bulb", live("lamp", () => this.toggleLamp()));
+    this.mistBtn = button(this, cx + 65, y, 122, 40, "Mist", "spray", live("mist", () => { Sim.mist(this.s); this.puff(); this.say("Pssst! +10 humidity"); }));
+    this.speedBtn = button(this, cx + 195, y, 122, 40, "▶ 1x", null, live("speed", () => this.cycleSpeed()));
   }
 
   buildPanel() {
     const g = this.add.graphics();
     g.fillStyle(COL.inkHex, 0.18).fillRoundedRect(770, 26, 490, 676, 22);
     g.fillStyle(COL.card).lineStyle(4, COL.inkHex).fillRoundedRect(766, 20, 490, 676, 22).strokeRoundedRect(766, 20, 490, 676, 22);
+    this.barGlow = this.add.graphics(); // the coach's highlight, under the bars
     this.dayText = label(this, 792, 56, "", 28);
     this.add.image(1102, 56, "icon-seed").setScale(30 / 96);
     this.seedText = label(this, 1122, 56, "", 26, COL.ink, 0);
@@ -207,6 +211,7 @@ class Jar extends Phaser.Scene {
       c.add(lock);
       c.setSize(146, 74).setInteractive({ useHandCursor: true }).on("pointerup", () => {
         if (!Req.canBuy(this.s, kind)) return this.say(`${Sim.KINDS[kind].name} comes with note ${unlockAt + 1}`);
+        if (!this.coach.allows("shop:" + kind)) return this.coach.nudge();
         this.select(this.selected === kind ? null : kind);
       });
       c.paint = () => {
@@ -222,6 +227,7 @@ class Jar extends Phaser.Scene {
 
   select(kind) {
     this.selected = kind;
+    if (this.coach.active) return; // the coach has its own prompt
     this.say(kind ? `Tap inside the jar to add a ${Sim.KINDS[kind].name.toLowerCase()} · ${Sim.KINDS[kind].blurb}` : "", 0, true);
   }
 
@@ -258,7 +264,7 @@ class Jar extends Phaser.Scene {
 
   cycleSpeed() {
     this.speedIdx = (this.speedIdx + 1) % SPEEDS.length;
-    const sp = SPEEDS[this.speedIdx];
+    const sp = this.coach.fast || SPEEDS[this.speedIdx];
     this.speedBtn.setLabel(sp ? `▶ ${sp}x` : "⏸ paused");
   }
 
@@ -266,10 +272,11 @@ class Jar extends Phaser.Scene {
     if (over.length) return;
     if (!inJar(p.x, p.y)) { this.tip.setVisible(false); if (this.selected) this.select(null); return; }
     if (!this.selected) return;
+    if (!this.coach.allows("jar")) return this.coach.nudge();
     const x = Phaser.Math.Clamp((p.x - JAR.x - 26) / (JAR.w - 52), 0, 1);
     const y = Phaser.Math.Clamp((JAR.soil - 6 - p.y) / AIR_H, 0.25, 0.85);
     const r = Req.place(this.s, this.selected, x, y);
-    if (r.ok) { Audio.blip(this, 520); this.say(`${Sim.KINDS[this.selected].name} added!`); this.selected = this.s.seeds >= Sim.KINDS[this.selected].cost ? this.selected : null; }
+    if (r.ok) { Audio.blip(this, 520); if (!this.coach.active) this.say(`${Sim.KINDS[this.selected].name} added!`); this.selected = this.s.seeds >= Sim.KINDS[this.selected].cost ? this.selected : null; }
     else this.say("Can't: " + r.why);
   }
 
@@ -289,7 +296,8 @@ class Jar extends Phaser.Scene {
     if (ev.type === "warn") { this.say("Last animal gone! Add one by tomorrow.", 6000); return; }
     if (ev.type === "lose") { this.showLose(ev.tip); return; }
     // done: the sim already paid the seeds and set up the next note; snapshot it for Rewind
-    this.noteSnap = structuredClone(this.s);
+    // (unless no animal is alive: Rewind must never bring back a jar that is already lost)
+    if (this.s.ents.some(e => Sim.ANIMALS.includes(e.kind))) this.noteSnap = structuredClone(this.s);
     this.thanks.push(ev.note);
     if (this.thanks.length === 1) this.thank(0);
   }
@@ -330,6 +338,7 @@ class Jar extends Phaser.Scene {
     this.tip.setVisible(false);
     this.syncButtons();
     this.card.noteId = null;
+    this.coach.reset();
   }
 
   // lid, lamp and speed controls follow the jar state (staged jars and Rewind start with the lamp on)
@@ -375,7 +384,7 @@ class Jar extends Phaser.Scene {
 
   // Frame --------------------------------------------------------------------
   update(time, delta) {
-    const sp = SPEEDS[this.speedIdx];
+    const sp = this.coach.fast || SPEEDS[this.speedIdx];
     this.acc += (delta / 1000) * sp / DAY_SECONDS;
     for (let n = 0; this.acc >= DT && n < 60 && !this.s.req.lost; n++) {
       Sim.tick(this.s, DT);
@@ -391,6 +400,7 @@ class Jar extends Phaser.Scene {
     this.night.setFillStyle(COL.night, dusk * 0.38);
     this.lampGlow.setAlpha(s.lamp ? 0.6 : 0);
 
+    this.coach.update(time);
     this.drawSoil(time);
     this.syncCreatures(time);
     this.drawPanel();
@@ -426,7 +436,8 @@ class Jar extends Phaser.Scene {
         if (glow) c.add(glow);
         c.add([img, bubble]);
         const big = e.kind === "fern" ? 120 : 50;
-        c.setSize(big, big).setInteractive({ useHandCursor: true }).on("pointerup", () => this.showTip(e, c.x, c.y));
+        // pointerdown, so the tap that places a creature doesn't also open its tooltip on release
+        c.setSize(big, big).setInteractive({ useHandCursor: true }).on("pointerdown", () => this.showTip(e, c.x, c.y));
         c.input.hitArea.y = look.oy === 1 || e.kind === "fern" ? -big / 2 : 0;
         (e.kind === "firefly" ? this.glows : this.ents).add(c);
         c.setScale(0); this.tweens.add({ targets: c, scale: 1, duration: 320, ease: "Back.Out" });

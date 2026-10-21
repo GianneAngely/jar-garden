@@ -7,8 +7,8 @@ import { pathToFileURL } from "node:url";
 import { launch, sleep } from "./cdp.mjs";
 
 const root = resolve(import.meta.dirname, "..");
-const url = process.argv[2] || pathToFileURL(join(root, "index.html")).href + "?mute&seed=7";
-const outDir = process.argv[3] || join(root, "dist", "shots");
+const url = process.argv.filter(a => !a.startsWith("-"))[2] || pathToFileURL(join(root, "index.html")).href + "?mute&seed=7";
+const outDir = process.argv.filter(a => !a.startsWith("-"))[3] || join(root, "dist", "shots");
 mkdirSync(outDir, { recursive: true });
 
 const cdp = await launch();
@@ -17,6 +17,7 @@ const shot = name => cdp.shot(join(outDir, name));
 const done = code => { cdp.close(); process.exit(code); };
 const ff = days => evaluate(`(() => { for (let i = 0; i < ${Math.round(days * 240)}; i++) Sim.tick(jar, 1/240); return jar.day; })()`);
 
+const V = process.argv.includes("-v");
 let fail = 0;
 const check = (ok, msg) => { console.log((ok ? "ok   " : "FAIL ") + msg); if (!ok) fail++; };
 
@@ -32,20 +33,34 @@ check(await evaluate(`!game.scene.getScene("Jar").speedBtn.visible`), "speed but
 await click(870 + 156, 556);           // springtail card, locked
 check(await evaluate(`game.scene.getScene("Jar").selected === null && game.scene.getScene("Jar").toastText.text.includes("note 2")`), "locked shop card explains when it opens");
 
+// onboarding, played for real at 1x: each beat's prompt, only the pointed control works, glow within ~35 s
+const coach = `game.scene.getScene("Jar").coach.pillText.text`;
+const t0 = Date.now();
+check((await evaluate(coach)).startsWith("Pip can't breathe"), "coach beat 1: open the lid");
+await click(555, 664);                 // Mist is locked for now
+check(await evaluate(`jar.hum < 50`), "locked control (Mist) does nothing during beat 1");
 await click(295, 664);
 check(await evaluate(`jar.lid === true`), "Open lid button");
+check(await waitFor(`${coach}.startsWith("Close it")`, 8000), "coach: close it once the air is fresh");
 await click(295, 664);
 check(await evaluate(`jar.lid === false`), "Close lid button");
+await click(555, 664);
+check(await evaluate(`jar.hum >= 54`), "Mist raises humidity");
+check((await evaluate(coach)).startsWith("Add a firefly"), "coach: add a firefly");
+await click(870 + 312, 556 + 84);      // firefly card
+await click(490, 330);
+check(await evaluate(`Sim.count(jar, "firefly") === 1 && jar.ents.some(e => e.name === "Dot")`), "Dot the firefly is in");
+check(await waitFor(`${coach}.startsWith("Dot hates the lamp")`, 25000), "coach: lamp off at dusk");
+await shot("2-onboarding-dusk.png");
 await click(425, 664);
 check(await evaluate(`jar.lamp === false`), "Lamp button");
-
-// finish note 1 by hand: a glowing firefly at night with the lamp off -> thank-you, then Mo's note
-await evaluate(`(() => { Req.place(jar, "firefly", 0.5, 0.6); jar.slots.forEach(sl => sl.moss = Math.max(sl.moss, 0.3)); jar.hum = 70; jar.lamp = false;
-  while (jar.req.i === 0) { Sim.tick(jar, 1/240); Req.gate(jar, 1/240); const ev = Req.update(jar, 1/240); if (ev) game.scene.getScene("Jar").onNote(ev); } })()`);
+check(await waitFor(`jar.req.i === 1`, 15000), "Dot glows: note 1 done");
+const secs = (Date.now() - t0) / 1000;
+check(secs < 40, `onboarding took ${secs.toFixed(1)} s with test clicks (< 40)`);
 check(await evaluate(`jar.req.i === 1 && jar.seeds >= 6`), "note 1 done pays its seeds");
 await sleep(3400);
 check(await evaluate(`game.scene.getScene("Jar").card.ask.text.startsWith("Moss on 40%") && game.scene.getScene("Jar").speedBtn.visible`), "Mo's note arrives, speed unlocked");
-await shot("2-note2.png");
+await shot("3-note2.png");
 
 await evaluate(`jar.seeds = 40; jar.req.shop = Sim.ANIMALS.concat(["moss", "fern", "mushroom"])`);
 await click(870 + 156, 556);           // springtail card
@@ -55,8 +70,8 @@ await click(600, 470);
 check(await evaluate(`Sim.count(jar, "springtail") === 2`), "tap in jar places springtails");
 await click(870 + 312, 556 + 84);      // firefly card
 await click(420, 320);
-await click(560, 300);
-check(await evaluate(`Sim.count(jar, "firefly") === 3`), "fireflies placed");
+await click(560, 300);                 // a tap that lands on a flying firefly opens its tooltip instead
+check(await evaluate(`Sim.count(jar, "firefly") >= 2`), "fireflies placed" + (V ? " " + await evaluate(`Sim.count(jar, "firefly") + " seeds " + jar.seeds + " sel " + game.scene.getScene("Jar").selected`) : ""));
 await click(870 + 312, 556);           // fern card
 await click(330, 480);
 check(await evaluate(`Sim.count(jar, "fern") === 1`), "fern placed");
@@ -64,13 +79,13 @@ check(await evaluate(`Sim.count(jar, "fern") === 1`), "fern placed");
 for (let i = 6; i < 15; i++) await evaluate(`jar.slots[${i}].moss = Math.max(jar.slots[${i}].moss, 0.6)`);
 await ff(3);
 await sleep(400);
-await shot("3-day.png");
+await shot("4-day.png");
 check(await evaluate(`jar.history.length > 10`), "graph history fills");
 
 // to night: fireflies glow
 await evaluate(`(() => { while (!(jar.day % 1 > 0.92)) Sim.tick(jar, 1/240); })()`);
 await sleep(800);
-await shot("4-night.png");
+await shot("5-night.png");
 check(await evaluate(`jar.ents.some(e => e.kind === "firefly" && e.glow)`), "fireflies glow at night");
 
 // click a creature to see its tooltip
@@ -85,9 +100,9 @@ await evaluate(`(() => { const sc = game.scene.getScene("Jar"); jar.ents = jar.e
   for (let k = 0; k < 260; k++) { Sim.tick(jar, 1/240); const ev = Req.update(jar, 1/240); if (ev) sc.onNote(ev); } })()`);
 await sleep(500);
 check(await evaluate(`game.scene.getScene("Jar").children.list.some(o => o.depth === 70)`), "lose shows the quiet-jar card");
-await shot("5-lose.png");
+await shot("6-lose.png");
 await click(640, 415);
-check(await evaluate(`(() => { const sc = game.scene.getScene("Jar"); return jar !== sc.noteSnap && jar.ents.some(e => Sim.ANIMALS.includes(e.kind)) && jar.req.i === sc.noteSnap.req.i && !jar.req.lost; })()`), "Rewind brings the jar back to the note start");
+check(await evaluate(`(() => { const sc = game.scene.getScene("Jar"); return jar !== sc.noteSnap && jar.ents.some(e => Sim.ANIMALS.includes(e.kind)) && jar.req.i === sc.noteSnap.req.i && !jar.req.lost; })()`), "Rewind brings the jar back to the note start" + (V ? " " + await evaluate(`(() => { const sc = game.scene.getScene("Jar"); return [jar === sc.noteSnap, jar.ents.length, jar.req.i, sc.noteSnap.req.i, jar.req.lost, sc.children.list.filter(o => o.depth === 70).length].join(","); })()`) : ""));
 
 check(errors.length === 0, "no console errors" + (errors.length ? ": " + errors.join(" | ") : ""));
 console.log(fail ? `${fail} FAILED` : "ALL OK", "shots in", outDir);
