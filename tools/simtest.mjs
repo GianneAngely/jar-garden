@@ -27,7 +27,7 @@ function check(name, ok, s) {
 // 1. Starter jar left alone: snail lives, moss spreads, seeds come in.
 {
   const s = run(Sim.create(1), 15);
-  check("starter jar survives 15 days alone", Sim.count(s, "snail") >= 1 && Sim.mossTotal(s) > 2 && s.seeds > 20, s);
+  check("starter jar survives 15 days alone", Sim.count(s, "snail") >= 1 && Sim.mossTotal(s) > 2 && s.seeds > 15, s);
 }
 
 // 2. Lid open for good: jar dries out, snail dies of dryness.

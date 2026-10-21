@@ -27,6 +27,12 @@ SPRITES = {
     "hedgehog": ("all/jgall-07.jpg", 420),
     "soil": ("all/jgall-03.jpg", 1100),
 }
+# neighbours: temporary picks from docs/m3/neighbours-ABC.jpg until Angel chooses (owl C, frog B, mole A)
+NEIGHBOURS = {
+    "owl": ("neighbours/jgn-owl2b.jpg", 420),
+    "frog": ("neighbours/jgn-frog2a.jpg", 420),
+    "mole": ("neighbours/jgn-mole1a.jpg", 420, 0.3),   # 0.3: grey the green tint seen through the glasses (top 30%)
+}
 ICONS = ["spray", "bulb", "lid", "drop", "seed", "sprout", "air", "heart"]   # all/jgall-10, 4x2 grid
 BACKGROUNDS = {"bg-day": "all/jgall-13.jpg", "bg-night": "all/jgall-09.jpg"}
 
@@ -53,6 +59,20 @@ def key_green(img):
     return Image.fromarray(np.dstack([out.clip(0, 255).astype(np.uint8), (alpha * 255).astype(np.uint8)]), "RGBA")
 
 
+def clear_spill(img, top=0):
+    """Drop leftover key-green pixels that key_green's pocket rule misses; with top > 0 also grey the pale green
+    tint in that top fraction (key green seen through glasses lenses)."""
+    a = np.asarray(img).astype(np.int16).copy()
+    greenness = a[..., 1] - np.maximum(a[..., 0], a[..., 2])
+    a[(greenness > 70) & (a[..., 1] > 150), 3] = 0
+    if top:
+        band = np.zeros(greenness.shape, bool)
+        band[: int(a.shape[0] * top)] = True
+        tint = band & (greenness > 6)
+        a[..., 1] = np.where(tint, np.maximum(a[..., 0], a[..., 2]) + 4, a[..., 1])
+    return Image.fromarray(a.astype(np.uint8), "RGBA")
+
+
 def trim(img):
     return img.crop(img.getchannel("A").point(lambda v: 255 if v > 16 else 0).getbbox())
 
@@ -66,6 +86,10 @@ def main():
     OUT.mkdir(exist_ok=True)
     for name, (src, side) in SPRITES.items():
         s = fit(trim(key_green(Image.open(FLOW / src))), side)
+        s.save(OUT / f"{name}.webp", quality=88, method=6)
+        print(f"{name}.webp {s.size}")
+    for name, (src, side, *top) in NEIGHBOURS.items():
+        s = fit(trim(clear_spill(key_green(Image.open(FLOW / src)), *top)), side)
         s.save(OUT / f"{name}.webp", quality=88, method=6)
         print(f"{name}.webp {s.size}")
     sheet = key_green(Image.open(FLOW / "all/jgall-10.jpg"))

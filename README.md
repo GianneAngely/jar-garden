@@ -8,10 +8,13 @@ Open `index.html` (Canvas on file://), or serve the folder for WebGL. `?mute` = 
 
 ## Tests
 - `node tools/simtest.mjs` — balance scenarios for `src/sim.js` (pure, no Phaser).
+- `node tools/reqtest.mjs` — the six neighbour notes on one jar: onboarding glow timing, 20 players, wrong/idle baselines, lose rule.
 - `node tools/test.mjs [url]` — silent headless browser run through the UI, screenshots in `dist/shots/`.
 - `tools/build.sh jar-garden` — itch zip in `dist/`.
+- `node tools/record.mjs tools/scenes/<name>.mjs out.gif` — silent frame-stepped GIF of a scripted scene.
 
 ## Layout
 - `src/sim.js` the simulation (rules in `docs/PLAN.md`)
-- `src/game.js` the jar scene + UI, `src/draw.js` placeholder creature art
-- `docs/PLAN.md` milestones to the Nov 5 deadline
+- `src/requests.js` the neighbour notes (goals, holds, unlocks, lose rule), `src/card.js` the note card
+- `src/game.js` the jar scene + UI
+- `docs/PLAN.md` milestones to the Nov 5 deadline, `docs/ONE-PAGER.md` the M3 game design

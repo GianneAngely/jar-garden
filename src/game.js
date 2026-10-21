@@ -2,7 +2,7 @@ const DT = 1 / 240;          // sim step (days)
 const DAY_SECONDS = 60;      // real seconds per in-game day at 1x
 const SPEEDS = [1, 2, 4, 0];
 const SHOP = ["moss", "springtail", "fern", "mushroom", "snail", "firefly"];
-const SPRITES = ["snail", "snail-sad", "springtail", "firefly", "fern", "mushroom", "moss", "mould", "leaves", "lamp", "cork", "soil", "hedgehog"];
+const SPRITES = ["snail", "snail-sad", "springtail", "firefly", "fern", "mushroom", "moss", "mould", "leaves", "lamp", "cork", "soil", "hedgehog", "owl", "frog", "mole"];
 const ICONS = ["spray", "bulb", "lid", "drop", "seed", "sprout", "air", "heart"];
 
 // creature sprite: display scale + origin. Ground creatures stand on the soil (origin bottom).
@@ -71,6 +71,8 @@ class Jar extends Phaser.Scene {
   create() {
     const seed = Number(QS.get("seed")) || (Date.now() % 100000) + 1;
     this.s = Sim.create(seed);
+    Req.create(this.s);
+    this.noteSnap = structuredClone(this.s);
     window.jar = this.s;
     this.speedIdx = 0;
     this.acc = 0;
@@ -117,8 +119,11 @@ class Jar extends Phaser.Scene {
     this.tipText = label(this, 0, 0, "", 18, COL.ink, 0.5);
     this.tip.add([this.tipBg, this.tipText]);
 
+    this.card = new NoteCard(this);
+    this.thanks = [];
+    this.syncButtons();
     this.input.on("pointerdown", (p, over) => this.tapJar(p, over));
-    this.input.keyboard?.on("keydown-SPACE", () => this.cycleSpeed());
+    this.input.keyboard?.on("keydown-SPACE", () => this.speedBtn.visible && this.cycleSpeed());
     this.input.keyboard?.on("keydown-ESC", () => this.select(null));
     window.STATE = "jar";
   }
@@ -197,11 +202,19 @@ class Jar extends Phaser.Scene {
       const n = Sim.KINDS[kind].cost;
       const cost = label(this, -12, 14, n + (n === 1 ? " seed" : " seeds"), 15, "#9a7a66");
       c.add([bg, icon, name, cost]);
-      c.setSize(146, 74).setInteractive({ useHandCursor: true }).on("pointerup", () => this.select(this.selected === kind ? null : kind));
+      const unlockAt = Req.NOTES.findIndex(nt => nt.unlock === kind);
+      const lock = label(this, -12, 14, `after note ${unlockAt + 1}`, 15, "#9a7a66");
+      c.add(lock);
+      c.setSize(146, 74).setInteractive({ useHandCursor: true }).on("pointerup", () => {
+        if (!Req.canBuy(this.s, kind)) return this.say(`${Sim.KINDS[kind].name} comes with note ${unlockAt + 1}`);
+        this.select(this.selected === kind ? null : kind);
+      });
       c.paint = () => {
-        const on = this.selected === kind, afford = this.s.seeds >= Sim.KINDS[kind].cost;
-        bg.clear().fillStyle(on ? 0xffe6a8 : 0xfffdf8).lineStyle(on ? 4 : 2, COL.inkHex, afford ? 1 : 0.35).fillRoundedRect(-73, -37, 146, 74, 14).strokeRoundedRect(-73, -37, 146, 74, 14);
-        c.setAlpha(afford ? 1 : 0.5);
+        const open = Req.canBuy(this.s, kind), on = this.selected === kind, afford = this.s.seeds >= Sim.KINDS[kind].cost;
+        bg.clear().fillStyle(on ? 0xffe6a8 : open ? 0xfffdf8 : 0xf1e6d6).lineStyle(on ? 4 : 2, COL.inkHex, afford && open ? 1 : 0.35).fillRoundedRect(-73, -37, 146, 74, 14).strokeRoundedRect(-73, -37, 146, 74, 14);
+        icon.setTint(open ? 0xffffff : 0x9a8a80);
+        cost.setVisible(open); lock.setVisible(!open);
+        c.setAlpha(open ? (afford ? 1 : 0.5) : 0.6);
       };
       return c;
     });
@@ -209,16 +222,17 @@ class Jar extends Phaser.Scene {
 
   select(kind) {
     this.selected = kind;
-    this.say(kind ? `Tap inside the jar to add a ${Sim.KINDS[kind].name.toLowerCase()} · ${Sim.KINDS[kind].blurb}` : "");
+    this.say(kind ? `Tap inside the jar to add a ${Sim.KINDS[kind].name.toLowerCase()} · ${Sim.KINDS[kind].blurb}` : "", 0, true);
   }
 
-  say(str) {
+  // short message over the jar; it fades after ms unless sticky (the "tap inside the jar" hint while placing)
+  say(str, ms = 2200, sticky = false) {
     this.toastText.setText(str).setWordWrapWidth(380).setAlign("center");
     const w = Math.min(410, this.toastText.width + 30), h = this.toastText.height + 16;
     this.toastBg.clear().fillStyle(0xfffdf8, 0.95).lineStyle(2, COL.inkHex).fillRoundedRect(-w / 2, -h / 2, w, h, 14).strokeRoundedRect(-w / 2, -h / 2, w, h, 14);
     this.tweens.killTweensOf(this.toast);
     this.toast.setAlpha(str ? 1 : 0);
-    if (str && !this.selected) this.tweens.add({ targets: this.toast, alpha: 0, delay: 2200, duration: 500 });
+    if (str && !sticky) this.tweens.add({ targets: this.toast, alpha: 0, delay: ms, duration: 500 });
   }
 
   puff() {
@@ -250,17 +264,17 @@ class Jar extends Phaser.Scene {
 
   tapJar(p, over) {
     if (over.length) return;
-    if (!inJar(p.x, p.y)) { this.tip.setVisible(false); return; }
+    if (!inJar(p.x, p.y)) { this.tip.setVisible(false); if (this.selected) this.select(null); return; }
     if (!this.selected) return;
     const x = Phaser.Math.Clamp((p.x - JAR.x - 26) / (JAR.w - 52), 0, 1);
     const y = Phaser.Math.Clamp((JAR.soil - 6 - p.y) / AIR_H, 0.25, 0.85);
-    const r = Sim.place(this.s, this.selected, x, y);
+    const r = Req.place(this.s, this.selected, x, y);
     if (r.ok) { Audio.blip(this, 520); this.say(`${Sim.KINDS[this.selected].name} added!`); this.selected = this.s.seeds >= Sim.KINDS[this.selected].cost ? this.selected : null; }
     else this.say("Can't: " + r.why);
   }
 
   showTip(e, x, y) {
-    const name = Sim.KINDS[e.kind].name;
+    const name = e.name || Sim.KINDS[e.kind].name;
     const str = e.why ? `${name}: ${e.why}` : `${name}: ${e.mood === "happy" ? "happy!" : "doing okay"}`;
     this.tipText.setText(str);
     const w = this.tipText.width + 24;
@@ -269,11 +283,107 @@ class Jar extends Phaser.Scene {
     this.tipFor = e.id;
   }
 
+  // Notes --------------------------------------------------------------------
+  onNote(ev) {
+    if (ev.type === "broke") { if (ev.why) this.say(`Oh no! ${ev.why}`); return; }
+    if (ev.type === "warn") { this.say("Last animal gone! Add one by tomorrow.", 6000); return; }
+    if (ev.type === "lose") { this.showLose(ev.tip); return; }
+    // done: the sim already paid the seeds and set up the next note; snapshot it for Rewind
+    this.noteSnap = structuredClone(this.s);
+    this.thanks.push(ev.note);
+    if (this.thanks.length === 1) this.thank(0);
+  }
+
+  // one thank-you at a time; a note finished during another's thank-you still gets read for a moment first
+  thank(wait) {
+    const note = this.thanks[0];
+    this.time.delayedCall(wait, () => {
+      Audio.blip(this, 880, 0.15);
+      this.card.celebrate(note, () => {
+        if (note.unlock === "speed") {
+          this.speedBtn.setVisible(true).setScale(0);
+          this.tweens.add({ targets: this.speedBtn, scale: 1, duration: 400, ease: "Back.Out" });
+          this.say("Speed unlocked! Try 2x.");
+        } else if (note.unlock) {
+          this.tweens.add({ targets: this.cards[SHOP.indexOf(note.unlock)], scale: 1.12, yoyo: true, repeat: 1, duration: 220 });
+          this.say(`New in the shop: ${Sim.KINDS[note.unlock].name}!`);
+        }
+        this.thanks.shift();
+        if (this.thanks.length) this.thank(1800);
+        else if (this.s.req.won) this.showWin();
+      });
+    });
+  }
+
+  bumpSeeds() {
+    this.tweens.killTweensOf(this.seedText);
+    this.seedText.setScale(1.35);
+    this.tweens.add({ targets: this.seedText, scale: 1, duration: 260, ease: "Back.Out" });
+  }
+
+  // swap in another jar state (Rewind): drop every creature view, re-sync buttons
+  loadJar(s) {
+    this.s = s;
+    window.jar = s;
+    for (const v of this.views.values()) v.c.destroy();
+    this.views.clear();
+    this.tip.setVisible(false);
+    this.syncButtons();
+    this.card.noteId = null;
+  }
+
+  // lid, lamp and speed controls follow the jar state (staged jars and Rewind start with the lamp on)
+  syncButtons() {
+    const s = this.s;
+    this.lidBtn.setLabel(s.lid ? "Close lid" : "Open lid");
+    this.lidBtn.setOn(s.lid);
+    this.lid.setPosition(this.lidHome.x + (s.lid ? 175 : 0), this.lidHome.y - (s.lid ? 40 : 0)).setAngle(s.lid ? 14 : 0);
+    this.lampBtn.setLabel(s.lamp ? "Lamp on" : "Lamp off");
+    this.lampBtn.setOn(s.lamp);
+    this.speedBtn.setVisible(s.req.perks.includes("speed"));
+  }
+
+  // a centred card over a dim screen, used for lose and (until M3c) the win
+  overlay(title, body, btnText, onTap) {
+    this.speedIdx = SPEEDS.length - 1; // pause
+    const o = this.add.container(0, 0).setDepth(70);
+    const dim = this.add.rectangle(0, 0, W, H, 0x2b2036, 0.45).setOrigin(0).setInteractive();
+    const g = this.add.graphics().fillStyle(COL.card).lineStyle(4, COL.inkHex).fillRoundedRect(W / 2 - 230, 210, 460, 260, 22).strokeRoundedRect(W / 2 - 230, 210, 460, 260, 22);
+    const t = label(this, W / 2, 260, title, 30, COL.ink, 0.5);
+    const b = this.add.text(W / 2, 320, body, { fontFamily: FONT, fontSize: "19px", color: COL.ink, align: "center", wordWrap: { width: 400 } }).setOrigin(0.5, 0.5);
+    const btn = button(this, W / 2, 415, 180, 46, btnText, null, () => { o.destroy(); onTap(); });
+    o.add([dim, g, t, b, btn]);
+    o.setAlpha(0);
+    this.tweens.add({ targets: o, alpha: 1, duration: 300 });
+  }
+
+  showLose(tip) {
+    this.overlay("The jar went quiet", `No animals are left.\nTip: ${tip}`, "Rewind", () => {
+      this.loadJar(structuredClone(this.noteSnap));
+      this.speedIdx = 0;
+      this.speedBtn.setLabel("▶ 1x");
+      this.say("Back to the start of this note.");
+    });
+  }
+
+  showWin() {
+    this.overlay("Party night!", "All six notes done. Your jar keeps living: play on as long as you like.", "Keep playing", () => {
+      this.speedIdx = 0;
+      this.speedBtn.setLabel("▶ 1x");
+    });
+  }
+
   // Frame --------------------------------------------------------------------
   update(time, delta) {
     const sp = SPEEDS[this.speedIdx];
     this.acc += (delta / 1000) * sp / DAY_SECONDS;
-    for (let n = 0; this.acc >= DT && n < 60; n++) { Sim.tick(this.s, DT); this.acc -= DT; }
+    for (let n = 0; this.acc >= DT && n < 60 && !this.s.req.lost; n++) {
+      Sim.tick(this.s, DT);
+      Req.gate(this.s, DT);
+      const ev = Req.update(this.s, DT);
+      this.acc -= DT;
+      if (ev) this.onNote(ev);
+    }
     const s = this.s;
     const sun = sunAt(s.day);
     const dusk = Phaser.Math.Clamp(1 - sun * 2.2, 0, 1);   // night art fades in only near sunset
@@ -293,7 +403,7 @@ class Jar extends Phaser.Scene {
       v.leaves.setVisible(sl.det > 0.05).setScale(0.12 + sl.det * 0.16);
       const m = sl.moss;
       v.moss.setVisible(m > 0.01);
-      if (m > 0.01) v.moss.setScale((sw * (1.6 + m * 1.4)) / 220, 0.12 + m * 0.3 + Math.sin(time / 900 + i) * 0.006).setAlpha(0.75 + m * 0.25);
+      if (m > 0.01) v.moss.setScale((sw * (2 + m * 1.8)) / 220, 0.16 + m * 0.5 + Math.sin(time / 900 + i) * 0.006).setAlpha(0.75 + m * 0.25);
       v.mould.setVisible(sl.mould > 0.02);
       if (sl.mould > 0.02) v.mould.setScale((sw * (1.2 + sl.mould * 2.2)) / 200, 0.12 + sl.mould * 0.32);
     });
@@ -392,6 +502,9 @@ class Jar extends Phaser.Scene {
       g.strokePath();
     }
     this.logText.setText(s.log.slice(0, 4).map(l => "· " + l.text).join("\n"));
+    const q = this.thanks[0]; // a finished note waiting for its thank-you stays on the card, full
+    const pr = q ? { note: q, goal: q.goal(s), p: 1, paused: false } : Req.progress(s);
+    if (pr) this.card.refresh(pr, Req.NOTES.indexOf(pr.note), Req.NOTES.length);
     for (const c of this.cards) c.paint();
   }
 }

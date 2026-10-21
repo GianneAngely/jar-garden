@@ -1,0 +1,164 @@
+// Neighbour note card on the left windowsill: who asks, what, live progress, the reward. Drawn in code next to
+// the Flow portraits. refresh() runs every frame but only re-lays out when the note changes.
+const WHO = { hazel: "hedgehog", mole: "mole", owl: "owl", frog: "frog" };
+const CARD = { x: 12, y: 132, w: 256 };
+const PORTRAIT_H = 236;
+const MUTED = "#9a7a66";
+const UNLOCK_NAME = { speed: "Speed button", springtail: "Springtail", mushroom: "Mushroom", fern: "Fern" };
+
+class NoteCard {
+  constructor(scene) {
+    this.scene = scene;
+    this.people = scene.add.container(0, 0).setDepth(29);
+    this.box = scene.add.container(CARD.x, CARD.y).setDepth(30);
+    this.bg = scene.add.graphics();
+    this.head = label(scene, 16, 24, "", 21);
+    this.count = label(scene, CARD.w - 16, 24, "", 15, MUTED, 1);
+    const wrap = { fontFamily: FONT, color: COL.ink, wordWrap: { width: CARD.w - 32 }, lineSpacing: 1 };
+    this.ask = scene.add.text(16, 42, "", { ...wrap, fontSize: "18px" });
+    this.line = scene.add.text(16, 0, "", { ...wrap, fontSize: "15px", color: MUTED });
+    this.viz = scene.add.graphics();
+    this.icons = scene.add.container(0, 0);
+    this.status = label(scene, 16, 0, "", 15);
+    this.chipBg = scene.add.graphics();
+    this.chipText = label(scene, 0, 0, "", 14, COL.ink, 0.5);
+    this.seedIcon = scene.add.image(26, 0, "icon-seed").setScale(20 / 96);
+    this.rewardText = label(scene, 42, 0, "", 15);
+    this.box.add([this.bg, this.head, this.count, this.ask, this.line, this.viz, this.icons, this.status, this.chipBg, this.chipText, this.seedIcon, this.rewardText]);
+    this.noteId = null;
+    this.shown = 0;   // eased meter value
+    this.busy = false;
+  }
+
+  // Lay out the card for a note: text blocks first, then the rows its goal needs (dots, pips, kind icons).
+  layout(note, index, total) {
+    this.noteId = note.id;
+    this.head.setText(note.name);
+    this.count.setText(`note ${index + 1}/${total}`);
+    this.ask.setText(note.ask);
+    this.line.setText(note.line).setY(this.ask.y + this.ask.height + 4);
+    let y = this.line.y + this.line.height + 12;
+    this.rows = {};
+    const g = note.goal(this.scene.s);
+    if (g.dots) { this.rows.dots = y; y += 20; }
+    if (g.pips) { this.rows.pips = y; y += 34; }
+    if (g.icons) { this.rows.icons = y; y += 36; }
+    this.rows.bar = y; y += 22;
+    this.status.setY(y + 4); y += 26;
+    this.rows.chip = y; y += 30;
+    this.seedIcon.setY(y + 8); this.rewardText.setY(y + 8);
+    const unlock = note.unlock ? ` · ${UNLOCK_NAME[note.unlock]}` : "";
+    this.rewardText.setText(note.reward ? `+${note.reward}${unlock}` : "a party postcard");
+    this.seedIcon.setVisible(!!note.reward);
+    this.h = y + 26;
+    this.drawBox();
+    this.buildIcons(g);
+    this.buildPeople(note.who);
+    this.shown = 0;
+  }
+
+  drawBox() {
+    const { w } = CARD, h = this.h, b = this.bg.clear();
+    b.fillStyle(COL.inkHex, 0.18).fillRoundedRect(4, 6, w, h, 18);
+    b.fillStyle(COL.card).lineStyle(3, COL.inkHex).fillRoundedRect(0, 0, w, h, 18).strokeRoundedRect(0, 0, w, h, 18);
+    // speech tail down towards the neighbour
+    b.fillStyle(COL.card).fillTriangle(96, h - 2, 128, h - 2, 112, h + 22);
+    b.lineStyle(3, COL.inkHex).lineBetween(96, h, 112, h + 22).lineBetween(112, h + 22, 128, h);
+  }
+
+  buildIcons(g) {
+    this.icons.removeAll(true);
+    this.pipImgs = [];
+    this.kindImgs = [];
+    if (g.pips) for (let i = 0; i < g.pips.of; i++) {
+      const im = this.scene.add.image(28 + i * 40, this.rows.pips + 14, "firefly").setScale(0.17);
+      const glow = this.scene.add.image(im.x - 6, im.y + 3, "glow").setScale(0.42).setTint(0xffe680).setBlendMode(Phaser.BlendModes.ADD);
+      this.icons.add([glow, im]);
+      this.pipImgs.push({ im, glow });
+    }
+    if (g.icons) g.icons.forEach((k, i) => {
+      const tex = this.scene.textures.get(k.key).getSourceImage();
+      const im = this.scene.add.image(30 + i * 38, this.rows.icons + 16, k.key).setScale(30 / Math.max(tex.width, tex.height));
+      const sad = this.scene.add.circle(im.x + 12, im.y - 11, 5, 0xc8553d).setStrokeStyle(2, COL.inkHex);
+      this.icons.add([im, sad]);
+      this.kindImgs.push({ im, sad });
+    });
+  }
+
+  buildPeople(who) {
+    this.people.removeAll(true);
+    const keys = who === "all" ? ["hedgehog", "mole", "owl", "frog"] : [WHO[who]];
+    const h = who === "all" ? 150 : PORTRAIT_H;
+    keys.forEach((k, i) => {
+      const tex = this.scene.textures.get(k).getSourceImage();
+      const x = who === "all" ? 42 + i * 62 : 124;
+      const im = this.scene.add.image(x, 724, k).setOrigin(0.5, 1).setScale(h / tex.height);
+      this.people.add(im);
+      im.y += h + 20;
+      this.scene.tweens.add({ targets: im, y: 724, duration: 520, delay: 120 + i * 90, ease: "Back.Out" });
+    });
+    this.box.setScale(0.85).setAlpha(0);
+    this.scene.tweens.add({ targets: this.box, scale: 1, alpha: 1, duration: 360, delay: 260, ease: "Back.Out" });
+  }
+
+  chip(text, fill) {
+    this.chipText.setText(text);
+    const w = Math.min(CARD.w - 24, this.chipText.width + 22), y = this.rows.chip + 12;
+    this.chipText.setPosition(CARD.w / 2, y);
+    this.chipBg.clear();
+    if (!text) return;
+    this.chipBg.fillStyle(fill).lineStyle(2, COL.inkHex, 0.6).fillRoundedRect(CARD.w / 2 - w / 2, y - 12, w, 24, 12).strokeRoundedRect(CARD.w / 2 - w / 2, y - 12, w, 24, 12);
+  }
+
+  refresh(pr, index, total) {
+    if (this.busy || !pr) return;
+    if (pr.note.id !== this.noteId) this.layout(pr.note, index, total);
+    const { note, goal } = pr, r = this.scene.s.req;
+    this.shown += (pr.p - this.shown) * 0.12;
+    const v = this.viz.clear(), bw = CARD.w - 32, by = this.rows.bar;
+    v.fillStyle(0xf1e6d6).fillRoundedRect(16, by, bw, 16, 8);
+    v.fillStyle(pr.paused ? 0xb9c7dd : 0x9fd08a).fillRoundedRect(16, by, Math.max(14, bw * this.shown), 16, 8);
+    v.lineStyle(2, COL.inkHex).strokeRoundedRect(16, by, bw, 16, 8);
+    if (goal.dots) goal.dots.forEach((m, i) => {
+      const x = 22 + i * 11.2, y = this.rows.dots + 8;
+      v.fillStyle(0x8a6448, 0.35).fillCircle(x, y, 4.5);
+      if (m > 0.02) v.fillStyle(0x7fb069).fillCircle(x, y, 1.5 + 3 * Math.min(1, m / 0.6));
+      if (m >= 0.6) v.lineStyle(1.5, 0xd9a521).strokeCircle(x, y, 5.5);
+    });
+    if (goal.pips) this.pipImgs.forEach((p, i) => {
+      const lit = i < goal.pips.n;
+      p.im.setAlpha(lit ? 1 : 0.3);
+      p.glow.setAlpha(lit && !pr.paused ? 0.8 : 0);
+    });
+    if (goal.icons) this.kindImgs.forEach((k, i) => { k.im.setAlpha(goal.icons[i].on ? 1 : 0.25); k.sad.setVisible(goal.icons[i].sad); });
+    const hrs = note.hold >= 0.2 ? ` · ${Math.floor(r.hold * 24)}h/${Math.round(note.hold * 24)}h` : "";
+    this.status.setText(goal.text + hrs);
+    if (pr.paused) this.chip("Paused till dusk", 0xdfe7f3);
+    else if (goal.why && !goal.ok) this.chip(goal.why, 0xf6d3c8);
+    else if (goal.hint && !goal.ok) this.chip(goal.hint, 0xffe6a8);
+    else this.chip("", 0);
+  }
+
+  // Thank-you beat: full bar, hearts, seeds fly to the counter, the neighbour bounces and leaves. then() shows the next.
+  celebrate(note, then) {
+    this.busy = true;
+    const sc = this.scene;
+    this.shown = 1;
+    this.chip("Thank you!", 0xcfe8c0);
+    this.viz.fillStyle(0x9fd08a).fillRoundedRect(16, this.rows.bar, CARD.w - 32, 16, 8).lineStyle(2, COL.inkHex).strokeRoundedRect(16, this.rows.bar, CARD.w - 32, 16, 8);
+    for (let k = 0; k < 8; k++) {
+      const a = (k / 8) * Math.PI * 2, h = sc.add.image(CARD.x + CARD.w / 2, CARD.y + this.h / 2, "icon-heart").setScale(0.18).setDepth(31);
+      sc.tweens.add({ targets: h, x: h.x + Math.cos(a) * 150, y: h.y + Math.sin(a) * 120, scale: 0.08, alpha: 0, duration: 900, ease: "Cubic.Out", onComplete: () => h.destroy() });
+    }
+    for (let k = 0; k < note.reward; k++) {
+      const sd = sc.add.image(CARD.x + 26, CARD.y + this.seedIcon.y, "icon-seed").setScale(0.22).setDepth(55);
+      sc.tweens.add({ targets: sd, x: 1102, y: 56, duration: 700, delay: 300 + k * 110, ease: "Cubic.In", onComplete: () => { sd.destroy(); sc.bumpSeeds?.(); } });
+    }
+    this.people.each(im => sc.tweens.add({ targets: im, scaleY: im.scaleY * 1.08, scaleX: im.scaleX * 0.94, yoyo: true, repeat: 2, duration: 160 }));
+    sc.time.delayedCall(2300, () => {
+      sc.tweens.add({ targets: this.box, alpha: 0, scale: 0.9, duration: 260 });
+      this.people.each(im => sc.tweens.add({ targets: im, y: 724 + im.displayHeight + 20, duration: 380, ease: "Back.In" }));
+      sc.time.delayedCall(450, () => { this.busy = false; this.noteId = null; then?.(); });
+    });
+  }
+}

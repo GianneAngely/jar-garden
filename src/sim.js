@@ -12,6 +12,8 @@
     firefly:    { cost: 6, name: "Firefly",    blurb: "Glows in the dark. Needs moss." },
   };
   const ANIMALS = ["snail", "springtail", "firefly"];
+  const FIREFLY_BREED = 0; // fireflies are bought, never born (rand draw kept for the RNG stream)
+  const MOSS_PAY = 5;      // moss pays a seed at >= 25% floor cover
   const CAP = { snail: 6, springtail: 24, firefly: 6, mushroom: 6, fern: 4 };
 
   const clamp = (v, a = 0, b = 1) => Math.max(a, Math.min(b, v));
@@ -87,15 +89,18 @@
   // One step of dt days (the game uses ~1/120) -----------------------------
   function tick(s, dt) {
     const prevDay = Math.floor(s.day);
+    const f = { air: { lid: 0, plants: 0, animals: 0, mould: 0 }, hum: { lid: 0, plants: 0, glass: 0 } };
     s.day += dt;
     const L = light(s);
     const dark = L < 0.15;
 
     // Air exchange through the lid
     if (s.lid) {
+      f.hum.lid += (40 - s.hum) * 1.2 * dt; f.air.lid += (100 - s.air) * 3 * dt;
       s.hum += (40 - s.hum) * 1.2 * dt;
       s.air += (100 - s.air) * 3 * dt;
     } else {
+      f.hum.glass -= 0.5 * dt + (s.hum > 88 ? (s.hum - 88) * 2 * dt : 0);
       s.hum -= 0.5 * dt;
       if (s.hum > 88) s.hum -= (s.hum - 88) * 2 * dt; // condenses on the glass
     }
@@ -136,6 +141,7 @@
       sl.moss = clamp(sl.moss); sl.mould = clamp(sl.mould); sl.det = clamp(sl.det);
       moss += sl.moss; mould += sl.mould;
     }
+    f.air.plants += moss * 2.0 * L * dt; f.air.mould -= mould * 1.2 * dt; f.hum.plants += moss * 0.3 * dt;
     s.air += moss * 2.0 * L * dt - mould * 1.2 * dt;
     s.hum += moss * 0.3 * dt;
 
@@ -155,6 +161,7 @@
         if (s.hum < 50) why.push("too dry");
         if (e.food < 0.2) why.push("too dim");
         if (!why.length) e.size = Math.min(1, e.size + 0.25 * L * dt);
+        f.air.plants += 1.6 * L * e.size * dt; f.hum.plants += 0.3 * e.size * dt;
         s.air += 1.6 * L * e.size * dt;
         s.hum += 0.3 * e.size * dt;
         sl.det += 0.04 * dt;
@@ -166,7 +173,7 @@
           s.slots[j].mould = Math.max(0, s.slots[j].mould - 0.8 * dt);
         }
         e.food -= 0.15 * dt;
-        s.air -= 0.4 * dt;
+        s.air -= 0.4 * dt; f.air.animals -= 0.4 * dt;
         if (s.hum < 55) why.push("too dry");
         if (e.food < 0.15) why.push("nothing to eat");
         breed = e.food > 0.8 && rand(s) < 0.3 * dt;
@@ -185,7 +192,7 @@
         if (sl.det > 0.02) { const t = Math.min(sl.det, 0.5 * dt); sl.det -= t; e.food += t * 1.5; }
         else if (sl.moss > 0.1) { const t = Math.min(sl.moss - 0.05, 0.25 * dt); sl.moss -= t; e.food += t; sl.det += t * 0.2; }
         e.food -= 0.3 * dt;
-        s.air -= 2.5 * dt;
+        s.air -= 2.5 * dt; f.air.animals -= 2.5 * dt;
         if (s.hum < 45) why.push("too dry");
         if (s.air < 35) why.push("stuffy air");
         if (e.food < 0.15) why.push("hungry");
@@ -196,7 +203,7 @@
         if (sl.mould > 0) { const t = Math.min(sl.mould, 0.45 * dt); sl.mould -= t; e.food += t * 1.6; }
         else if (sl.det > 0) { const t = Math.min(sl.det, 0.25 * dt); sl.det -= t; e.food += t * 1.6; }
         e.food += sl.moss * 0.3 * dt - 0.3 * dt; // nibbles the film on old moss
-        s.air -= 0.15 * dt;
+        s.air -= 0.15 * dt; f.air.animals -= 0.15 * dt;
         if (s.hum < 55) why.push("too dry");
         if (e.food < 0.15) why.push("hungry");
         breed = e.food > 0.7 && rand(s) < 0.8 * dt;
@@ -209,12 +216,12 @@
         e.x += (e.tx - e.x) * 6 * dt;
         e.y += (e.ty - e.y) * 6 * dt;
         e.food += moss > 3 ? 0.3 * dt : -0.3 * dt;
-        s.air -= 0.4 * dt;
+        s.air -= 0.4 * dt; f.air.animals -= 0.4 * dt;
         e.glow = dark;
         if (s.hum < 50) why.push("too dry");
         if (moss <= 3) why.push("needs more moss");
         if (isNight(s) && s.lamp) why.push("lamp too bright");
-        breed = e.glow && e.hp > 0.8 && e.food > 0.7 && rand(s) < 0.25 * dt;
+        breed = e.glow && e.hp > 0.8 && e.food > 0.7 && rand(s) < FIREFLY_BREED * dt;
       }
 
       if (s.air < 20 && e.kind !== "fern") why.push("can't breathe");
@@ -247,6 +254,9 @@
 
     s.hum = clamp(s.hum, 0, 100);
     s.air = clamp(s.air, 0, 100);
+    const k = Math.min(1, dt * 20);
+    s.flux ||= { air: {}, hum: {} };
+    for (const key of ["air", "hum"]) for (const src in f[key]) s.flux[key][src] = (s.flux[key][src] || 0) + (f[key][src] / dt - (s.flux[key][src] || 0)) * k;
 
     // history every 0.1 day, payday at each new morning
     if (Math.floor(s.day * 10) !== Math.floor((s.day - dt) * 10)) {
@@ -257,15 +267,14 @@
   }
 
   function payday(s) {
-    const happy = s.ents.filter(e => e.mood === "happy").length;
-    const kinds = new Set(s.ents.map(e => e.kind));
-    if (mossTotal(s) > 1) kinds.add("moss");
-    const earned = Math.round(Math.min(happy, 12) * 0.5 + kinds.size);
-    s.seeds += earned;
-    note(s, `Day ${Math.floor(s.day) + 1}: +${earned} seeds.`);
+    const kinds = new Set(s.ents.filter(e => e.mood === "happy").map(e => e.kind));
+    if (mossTotal(s) >= MOSS_PAY) kinds.add("moss");
+    s.lastPay = { day: Math.floor(s.day) + 1, kinds: [...kinds] };
+    s.seeds += kinds.size;
+    note(s, `Day ${Math.floor(s.day) + 1}: +${kinds.size} seeds.`);
   }
 
-  const api = { N, KINDS, ANIMALS, CAP, create, tick, place, setLid, setLamp, mist, light, isNight, count, mossTotal, mouldTotal, slotOf, slotX };
+  const api = { MOSS_PAY, N, KINDS, ANIMALS, CAP, create, tick, place, setLid, setLamp, mist, light, isNight, count, mossTotal, mouldTotal, slotOf, slotX };
   if (typeof module !== "undefined") module.exports = api;
   else root.Sim = api;
 })(this);
