@@ -1,24 +1,27 @@
 // Silent GIF recorder. Stops Phaser's own loop and steps the game frame by frame, so the GIF is smooth
 // and the same every run no matter how slow headless Chrome is. A drawn cursor shows every click.
-// usage: node tools/record.mjs <scenario.mjs> <out.gif> [--fps 20] [--width 800] [--query "seed=7"]
+// usage: node tools/record.mjs <scenario.mjs> <out.gif> [--fps 20] [--width 800] [--query "seed=7"] [--http]
+// --http serves the folder and renders with the GPU in WebGL, like itch (needed for postcard photos).
 // A scenario exports `default async function (rec)` using rec.wait(sec), rec.until(js), rec.click(gx, gy), rec.eval(js).
 import { execFileSync } from "node:child_process";
 import { mkdtempSync, rmSync, writeFileSync, mkdirSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve, dirname } from "node:path";
 import { pathToFileURL } from "node:url";
-import { launch, sleep } from "./cdp.mjs";
+import { launch, serve, sleep } from "./cdp.mjs";
 
 const root = resolve(import.meta.dirname, "..");
 const [scenarioPath, outPath] = process.argv.slice(2);
 const opt = (k, d) => { const i = process.argv.indexOf("--" + k); return i > 0 ? process.argv[i + 1] : d; };
 const FPS = Number(opt("fps", 20)), WIDTH = Number(opt("width", 800));
 if (!scenarioPath || !outPath) { console.log("usage: node tools/record.mjs <scenario.mjs> <out.gif>"); process.exit(1); }
-const scenario = (await import(pathToFileURL(resolve(scenarioPath)).href)).default;
-const url = pathToFileURL(join(root, "index.html")).href + "?mute&" + opt("query", scenario.query || "seed=7");
+const mod = await import(pathToFileURL(resolve(scenarioPath)).href);
+const scenario = Object.assign(mod.default, { http: mod.http, query: mod.query }); // optional named exports
+const server = process.argv.includes("--http") || scenario.http ? await serve(root) : null;
+const url = (server ? server.url + "index.html" : pathToFileURL(join(root, "index.html")).href) + "?mute&" + opt("query", scenario.query || "seed=7&play");
 
 const frames = mkdtempSync(join(tmpdir(), "jg-frames-"));
-const cdp = await launch();
+const cdp = await launch({ gpu: !!server });
 let n = 0;
 const D = 1000 / FPS;
 const snap = async () => writeFileSync(join(frames, `f${String(n++).padStart(5, "0")}.png`), await cdp.png());
@@ -47,7 +50,7 @@ const rec = {
 
 try {
   await cdp.open(url);
-  if (!(await cdp.waitFor(`window.STATE`))) throw new Error("game did not load");
+  if (!(await cdp.waitFor(`window.STATE === (location.search.includes("play") ? "jar" : "title")`))) throw new Error("game did not load");
   await sleep(400);
   await cdp.evaluate(`(() => {
     game.loop.sleep(); window.__t = performance.now();
@@ -72,5 +75,6 @@ try {
   console.log(`${outPath}: ${n} frames, ${(n / FPS).toFixed(1)} s`);
 } finally {
   cdp.close();
+  server?.close();
   rmSync(frames, { recursive: true, force: true });
 }

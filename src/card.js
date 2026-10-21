@@ -139,8 +139,9 @@ class NoteCard {
     else this.chip("", 0);
   }
 
-  // Thank-you beat: full bar, hearts, seeds fly to the counter, the neighbour bounces and leaves. then() shows the next.
-  celebrate(note, then) {
+  // Thank-you beat: full bar, hearts, seeds fly to the counter, the neighbour bounces, the card turns into their
+  // postcard (photo = texture key of the jar snapshot, or null), then they leave. then() shows the next note.
+  celebrate(note, then, day, photo) {
     this.busy = true;
     const sc = this.scene;
     this.shown = 1;
@@ -155,10 +156,56 @@ class NoteCard {
       sc.tweens.add({ targets: sd, x: 1102, y: 56, duration: 700, delay: 300 + k * 110, ease: "Cubic.In", onComplete: () => { sd.destroy(); sc.bumpSeeds?.(); } });
     }
     this.people.each(im => sc.tweens.add({ targets: im, scaleY: im.scaleY * 1.08, scaleX: im.scaleX * 0.94, yoyo: true, repeat: 2, duration: 160 }));
-    sc.time.delayedCall(2300, () => {
+    sc.time.delayedCall(1300, () => {
       sc.tweens.add({ targets: this.box, alpha: 0, scale: 0.9, duration: 260 });
-      this.people.each(im => sc.tweens.add({ targets: im, y: 724 + im.displayHeight + 20, duration: 380, ease: "Back.In" }));
-      sc.time.delayedCall(450, () => { this.busy = false; this.noteId = null; then?.(); });
+      const pc = postcard(sc, note, day, photo).setPosition(140, 300).setDepth(31).setAngle(-14).setScale(0.6).setAlpha(0);
+      sc.tweens.add({ targets: pc, angle: -4, scale: 1, alpha: 1, duration: 520, ease: "Back.Out" });
+      sc.time.delayedCall(3400, () => {
+        sc.tweens.add({ targets: pc, x: -200, angle: -20, duration: 450, ease: "Back.In", onComplete: () => pc.destroy() });
+        this.people.each(im => sc.tweens.add({ targets: im, y: 724 + im.displayHeight + 20, duration: 380, ease: "Back.In" }));
+        sc.time.delayedCall(480, () => { this.busy = false; this.noteId = null; then?.(); });
+      });
     });
   }
+}
+
+// A postcard from the neighbour: a photo of your jar when the note was done (or the neighbour, when the
+// browser can't take snapshots), their thank-you, a stamp with their face and a postmark with the day.
+const STAMP = { hazel: "hedgehog", mole: "mole", owl: "owl", frog: "frog", all: "firefly" };
+function postcard(scene, note, day, photo) {
+  const c = scene.add.container(0, 0);
+  const w = 250, h = 318, px = -w / 2 + 14, py = -h / 2 + 14, pw = w - 28, ph = 200;
+  const g = scene.add.graphics();
+  g.fillStyle(COL.inkHex, 0.22).fillRoundedRect(-w / 2 + 5, -h / 2 + 7, w, h, 10);
+  g.fillStyle(0xfffaf1).lineStyle(3, COL.inkHex).fillRoundedRect(-w / 2, -h / 2, w, h, 10).strokeRoundedRect(-w / 2, -h / 2, w, h, 10);
+  g.fillStyle(0xdfeee9).fillRect(px, py, pw, ph);
+  c.add(g);
+  if (photo && scene.textures.exists(photo)) {
+    const im = scene.add.image(px + pw / 2, py + ph / 2, photo);
+    const k = Math.max(pw / im.width, ph / im.height);
+    im.setScale(k).setCrop((im.width - pw / k) / 2, (im.height - ph / k) / 2, pw / k, ph / k);
+    c.add(im);
+  } else {
+    const im = scene.add.image(px + pw / 2, py + ph, STAMP[note.who] === "firefly" ? "hedgehog" : STAMP[note.who]).setOrigin(0.5, 1);
+    im.setScale((ph - 12) / im.height);
+    c.add(im);
+  }
+  const frame = scene.add.graphics().lineStyle(2, COL.inkHex, 0.7).strokeRect(px, py, pw, ph);
+  const msg = scene.add.text(-w / 2 + 16, py + ph + 10, note.thanks, { fontFamily: FONT, fontSize: "15px", color: COL.ink, wordWrap: { width: w - 32 }, lineSpacing: 1 });
+  const sig = label(scene, w / 2 - 16, h / 2 - 18, "~ " + note.name, 17, COL.ink, 1);
+  // stamp: scalloped paper edge around the neighbour's face
+  const sx = w / 2 - 36, sy = -h / 2 + 34, st = scene.add.graphics();
+  st.fillStyle(0xfffaf1);
+  for (let i = 0; i <= 6; i++) for (const [x, y] of [[-24 + i * 8, -28], [-24 + i * 8, 28], [-24, -28 + i * 9.33], [24, -28 + i * 9.33]]) st.fillCircle(sx + x, sy + y, 4.5);
+  st.fillRect(sx - 24, sy - 28, 48, 56).fillStyle(0xf3d9cf).fillRect(sx - 19, sy - 23, 38, 46);
+  st.lineStyle(1.5, COL.inkHex, 0.6).strokeRect(sx - 19, sy - 23, 38, 46);
+  const key = STAMP[note.who], tw = scene.textures.get(key).getSourceImage().width;
+  const face = scene.add.image(0, 0, key).setOrigin(0);
+  const cw = tw * (key === "firefly" ? 1 : 0.62), k = 36 / cw, cx = (tw - cw) / 2, cy = key === "firefly" ? 0 : tw * 0.02;
+  face.setScale(k).setCrop(cx, cy, cw, cw * 44 / 36).setPosition(sx - 18 - cx * k, sy - 22 - cy * k);
+  // postmark rings with the day
+  const pm = scene.add.graphics().lineStyle(2, COL.inkHex, 0.45).strokeCircle(sx - 44, sy + 22, 22).strokeCircle(sx - 44, sy + 22, 16);
+  const pmt = label(scene, sx - 44, sy + 22, `DAY ${day}`, 11, "#7a5a44", 0.5).setAngle(-12).setAlpha(0.8);
+  c.add([frame, msg, sig, st, face, pm, pmt]);
+  return c;
 }

@@ -54,3 +54,23 @@ Tes: `node tools/test.mjs` (25/25).
 **Masih kurang:**
 - Momen kunang-kunang nyala masih kecil di layar. Di M4 cahayanya digedein, ada sinar lembut ke lumut, partikel, dan suara lembut.
 - Belum ada layar judul, jadi game langsung mulai di toples (itu M3c).
+
+## M3c Layar judul + kartu pos (22 Okt)
+GIF: `docs/m3/m3c-title-postcards.gif` (judul, Play, kartu pos Hazel berisi foto toples sendiri, kolase 6 kartu pos di akhir)
+
+Tes: `node tools/test.mjs` (27/27, file:// Canvas) sama `node tools/test.mjs --http` (28/28, WebGL GPU kayak di itch, termasuk cek foto kartu pos).
+
+**Udah enak:**
+- Layar judul pakai key art M2 sama logo A sementara (lumut + tunas), plus tagline "a tiny living world in a jar". Ada satu tombol Play yang berdenyut, dan kunang-kunang melayang di sekitar toples. Enter atau Space juga langsung main.
+- Kartu pos muncul tiap catatan selesai. Fotonya toples pemain sendiri pas momen itu (misalnya Dot lagi nyala). Ada juga perangko muka tetangga, cap pos "DAY n", sama ucapan makasih yang pendek.
+- Layar akhir "Party night!" ngumpulin 6 kartu pos jadi cerita toples dari hari ke hari, plus angka (hari, bayi lahir, jumlah jenis). Tombol "Keep playing" buat lanjut free play.
+
+**Belum enak, udah dibenerin:**
+- Di file:// (Canvas) foto toples ga bisa diambil karena canvas-nya tainted. Kartu pos sekarang otomatis pakai gambar tetangga. Di itch (http, WebGL) fotonya jalan.
+- Swiftshader headless cuma jalan 3 fps di WebGL. Alat tes sama recorder sekarang pakai GPU Metal (60 fps) buat mode `--http`.
+- Recorder macet pas nunggu foto WebGL, soalnya loop-nya di-pause. Sekarang skenario nge-render satu frame buat tiap foto.
+
+**Masih kurang:**
+- Logo sama tetangga masih pilihan sementara, nunggu Angel milih (lembar A/B/C udah dikirim).
+- Kanan layar judul masih kosong (dinding). Mungkin nanti ditaruh kredit kecil atau tanaman gantung bergoyang.
+- Belum ada musik di layar judul (itu M4).

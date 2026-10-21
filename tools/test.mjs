@@ -4,17 +4,19 @@
 import { mkdirSync } from "node:fs";
 import { join, resolve } from "node:path";
 import { pathToFileURL } from "node:url";
-import { launch, sleep } from "./cdp.mjs";
+import { launch, serve, sleep } from "./cdp.mjs";
 
+// --http: serve the folder over http (WebGL + jar snapshots, like itch); default file:// (Canvas)
 const root = resolve(import.meta.dirname, "..");
-const url = process.argv.filter(a => !a.startsWith("-"))[2] || pathToFileURL(join(root, "index.html")).href + "?mute&seed=7";
+const server = process.argv.includes("--http") ? await serve(root) : null;
+const url = process.argv.filter(a => !a.startsWith("-"))[2] || (server ? server.url + "index.html" : pathToFileURL(join(root, "index.html")).href) + "?mute&seed=7";
 const outDir = process.argv.filter(a => !a.startsWith("-"))[3] || join(root, "dist", "shots");
 mkdirSync(outDir, { recursive: true });
 
-const cdp = await launch();
+const cdp = await launch({ gpu: !!server });
 const { evaluate, waitFor, click, errors } = cdp;
 const shot = name => cdp.shot(join(outDir, name));
-const done = code => { cdp.close(); process.exit(code); };
+const done = code => { cdp.close(); server?.close(); process.exit(code); };
 const ff = days => evaluate(`(() => { for (let i = 0; i < ${Math.round(days * 240)}; i++) Sim.tick(jar, 1/240); return jar.day; })()`);
 
 const V = process.argv.includes("-v");
@@ -22,7 +24,11 @@ let fail = 0;
 const check = (ok, msg) => { console.log((ok ? "ok   " : "FAIL ") + msg); if (!ok) fail++; };
 
 await cdp.open(url);
-check(await waitFor(`window.STATE === "jar"`), "jar scene loads");
+check(await waitFor(`window.STATE === "title"`), "title screen loads");
+await sleep(400);
+await shot("0-title.png");
+await click(381, 362);                 // Play
+check(await waitFor(`window.STATE === "jar"`), "Play opens the jar");
 check(await evaluate(`!game.sound.context`), "silent (?mute)");
 await sleep(500);
 await shot("1-start.png");
@@ -58,9 +64,11 @@ check(await waitFor(`jar.req.i === 1`, 15000), "Dot glows: note 1 done");
 const secs = (Date.now() - t0) / 1000;
 check(secs < 40, `onboarding took ${secs.toFixed(1)} s with test clicks (< 40)`);
 check(await evaluate(`jar.req.i === 1 && jar.seeds >= 6`), "note 1 done pays its seeds");
-await sleep(3400);
-check(await evaluate(`game.scene.getScene("Jar").card.ask.text.startsWith("Moss on 40%") && game.scene.getScene("Jar").speedBtn.visible`), "Mo's note arrives, speed unlocked");
-await shot("3-note2.png");
+await sleep(2000);
+await shot("3-postcard.png");
+if (server) check(await evaluate(`game.renderer.type === Phaser.WEBGL && game.textures.exists("pc-glow")`), "WebGL over http: jar photo taken for the postcard");
+check(await waitFor(`game.scene.getScene("Jar").card.ask.text.startsWith("Moss on 40%") && game.scene.getScene("Jar").speedBtn.visible`, 9000), "postcard, then Mo's note arrives, speed unlocked");
+await shot("3b-note2.png");
 
 await evaluate(`jar.seeds = 40; jar.req.shop = Sim.ANIMALS.concat(["moss", "fern", "mushroom"])`);
 await click(870 + 156, 556);           // springtail card

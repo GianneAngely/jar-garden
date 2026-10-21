@@ -53,6 +53,8 @@ class Boot extends Phaser.Scene {
     for (const k of ICONS) this.load.image("icon-" + k, `assets/icon-${k}.webp`);
     this.load.image("bg-day", "assets/bg-day.jpg");
     this.load.image("bg-night", "assets/bg-night.jpg");
+    this.load.image("title", "assets/title.jpg");
+    this.load.image("logo", "assets/logo.webp");
   }
   create() {
     Audio.apply(this.game);
@@ -61,7 +63,7 @@ class Boot extends Phaser.Scene {
     const grd = ctx.createRadialGradient(64, 64, 0, 64, 64, 64);
     grd.addColorStop(0, "rgba(255,255,255,1)"); grd.addColorStop(0.35, "rgba(255,255,255,0.45)"); grd.addColorStop(1, "rgba(255,255,255,0)");
     ctx.fillStyle = grd; ctx.fillRect(0, 0, 128, 128); t.refresh();
-    document.fonts.load("600 22px Fredoka").finally(() => this.scene.start("Jar"));
+    document.fonts.load("600 22px Fredoka").finally(() => this.scene.start(QS.has("play") ? "Jar" : "Title"));
   }
 }
 
@@ -305,7 +307,7 @@ class Jar extends Phaser.Scene {
   // one thank-you at a time; a note finished during another's thank-you still gets read for a moment first
   thank(wait) {
     const note = this.thanks[0];
-    this.time.delayedCall(wait, () => {
+    this.time.delayedCall(wait, () => this.snapJar("pc-" + note.id, photo => {
       Audio.blip(this, 880, 0.15);
       this.card.celebrate(note, () => {
         if (note.unlock === "speed") {
@@ -319,7 +321,21 @@ class Jar extends Phaser.Scene {
         this.thanks.shift();
         if (this.thanks.length) this.thank(1800);
         else if (this.s.req.won) this.showWin();
-      });
+      }, Math.floor(this.s.day) + 1, photo);
+    }));
+  }
+
+  // Photo of the jar for a postcard: hide the floating UI for one frame, read the pixels back, add as a texture.
+  // file:// in Canvas mode taints the canvas (no read-back), so there the postcard shows the neighbour instead.
+  snapJar(key, done) {
+    if (LOCAL && this.game.renderer.type !== Phaser.WEBGL) return done(null);
+    const hidden = [this.toast, this.tip, this.coach.ui].filter(o => o.visible && o.alpha > 0);
+    hidden.forEach(o => o.setVisible(false));
+    this.game.renderer.snapshotArea(JAR.x - 14, JAR.y - 30, JAR.w + 28, JAR.floor - JAR.y + 46, img => {
+      hidden.forEach(o => o.setVisible(true));
+      if (this.textures.exists(key)) this.textures.remove(key);
+      this.textures.addImage(key, img);
+      done(key);
     });
   }
 
@@ -375,11 +391,24 @@ class Jar extends Phaser.Scene {
     });
   }
 
+  // The end: every postcard from the six notes in a row (photos of your jar over the whole story), a few numbers
   showWin() {
-    this.overlay("Party night!", "All six notes done. Your jar keeps living: play on as long as you like.", "Keep playing", () => {
-      this.speedIdx = 0;
-      this.speedBtn.setLabel("▶ 1x");
+    this.speedIdx = SPEEDS.length - 1;
+    const s = this.s, o = this.add.container(0, 0).setDepth(70);
+    const dim = this.add.rectangle(0, 0, W, H, 0x2b2036, 0.5).setOrigin(0).setInteractive();
+    const g = this.add.graphics().fillStyle(COL.card).lineStyle(4, COL.inkHex).fillRoundedRect(130, 70, 1020, 580, 26).strokeRoundedRect(130, 70, 1020, 580, 26);
+    o.add([dim, g, label(this, W / 2, 124, "Party night!", 40, COL.ink, 0.5), label(this, W / 2, 168, "Your neighbours sent you six postcards.", 20, "#9a7a66", 0.5)]);
+    Req.NOTES.forEach((n, i) => {
+      const pc = postcard(this, n, s.req.days?.[i] ?? i + 1, "pc-" + n.id).setScale(0.6).setPosition(240 + i * 160, 336).setAngle(i % 2 ? 4 : -4);
+      o.add(pc);
+      pc.setAlpha(0).y += 30;
+      this.tweens.add({ targets: pc, alpha: 1, y: 336, delay: 300 + i * 140, duration: 420, ease: "Back.Out" });
     });
+    const kinds = Req.SPECIES.filter(k => Req.species(s)[k].n > 0).length;
+    o.add(label(this, W / 2, 506, `${Math.floor(s.day) + 1} days · ${s.born} babies born · ${kinds} kinds living together`, 20, COL.ink, 0.5));
+    o.add(button(this, W / 2, 580, 220, 50, "Keep playing", null, () => { o.destroy(); this.speedIdx = 0; this.speedBtn.setLabel("▶ 1x"); }));
+    o.setAlpha(0);
+    this.tweens.add({ targets: o, alpha: 1, duration: 400 });
   }
 
   // Frame --------------------------------------------------------------------

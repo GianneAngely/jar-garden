@@ -34,7 +34,8 @@ NEIGHBOURS = {
     "mole": ("neighbours/jgn-mole1a.jpg", 420, 0.3),   # 0.3: grey the green tint seen through the glasses (top 30%)
 }
 ICONS = ["spray", "bulb", "lid", "drop", "seed", "sprout", "air", "heart"]   # all/jgall-10, 4x2 grid
-BACKGROUNDS = {"bg-day": "all/jgall-13.jpg", "bg-night": "all/jgall-09.jpg"}
+BACKGROUNDS = {"bg-day": "all/jgall-13.jpg", "bg-night": "all/jgall-09.jpg", "title": "../../docs/m2/keyart-draft.jpg"}
+LOGO = ("logo/jgl-logo1b.jpg", 640)   # temporary pick A from docs/m3/title-logo-ABC.jpg until Angel chooses
 
 
 def key_green(img):
@@ -92,6 +93,9 @@ def main():
         s = fit(trim(clear_spill(key_green(Image.open(FLOW / src)), *top)), side)
         s.save(OUT / f"{name}.webp", quality=88, method=6)
         print(f"{name}.webp {s.size}")
+    s = fit(trim(clear_spill(key_green(Image.open(FLOW / LOGO[0])))), LOGO[1])
+    s.save(OUT / "logo.webp", quality=90, method=6)
+    print(f"logo.webp {s.size}")
     sheet = key_green(Image.open(FLOW / "all/jgall-10.jpg"))
     cw, ch = sheet.width / 4, sheet.height / 2
     for i, name in enumerate(ICONS):

@@ -8,11 +8,11 @@ import { join } from "node:path";
 const CHROME = "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome";
 export const sleep = ms => new Promise(r => setTimeout(r, ms));
 
-export async function launch({ width = 1280, height = 720, scale = 1, mobile = false } = {}) {
+export async function launch({ width = 1280, height = 720, scale = 1, mobile = false, gpu = false } = {}) {
   const ud = mkdtempSync(join(tmpdir(), "jargarden-"));
   const port = 9300 + Math.floor(Math.random() * 500);
   const proc = spawn(CHROME, ["--headless=new", "--mute-audio", `--user-data-dir=${ud}`, `--remote-debugging-port=${port}`,
-    "--use-angle=swiftshader", "--enable-unsafe-swiftshader", "--hide-scrollbars", "about:blank"], { stdio: "ignore" });
+    ...(gpu ? ["--use-angle=metal", "--enable-gpu"] : ["--use-angle=swiftshader", "--enable-unsafe-swiftshader"]), "--hide-scrollbars", "about:blank"], { stdio: "ignore" });
   const close = () => { proc.kill("SIGKILL"); rmSync(ud, { recursive: true, force: true }); };
 
   let ws;
@@ -63,4 +63,20 @@ export async function launch({ width = 1280, height = 720, scale = 1, mobile = f
   if (mobile) await send("Emulation.setTouchEmulationEnabled", { enabled: true, maxTouchPoints: 5 });
   const open = async url => { await send("Page.navigate", { url }); };
   return { send, evaluate, waitFor, png, shot, click, open, errors, close };
+}
+
+// Static file server for the game folder, so headless runs can use http:// (WebGL, canvas read-back) like itch.
+// Lives only as long as the test process. Returns { url, close }.
+export async function serve(root) {
+  const { createServer } = await import("node:http");
+  const { readFile } = await import("node:fs/promises");
+  const { extname, join, normalize } = await import("node:path");
+  const TYPES = { ".html": "text/html", ".js": "text/javascript", ".css": "text/css", ".webp": "image/webp", ".jpg": "image/jpeg", ".png": "image/png", ".mp3": "audio/mpeg", ".ogg": "audio/ogg", ".json": "application/json" };
+  const srv = createServer(async (req, res) => {
+    const path = normalize(decodeURIComponent(new URL(req.url, "http://x").pathname)).replace(/^(\.\.[/\\])+/, "");
+    try { const body = await readFile(join(root, path.endsWith("/") ? path + "index.html" : path)); res.writeHead(200, { "content-type": TYPES[extname(path)] || "application/octet-stream" }); res.end(body); }
+    catch { res.writeHead(404); res.end(); }
+  });
+  await new Promise(r => srv.listen(0, "127.0.0.1", r));
+  return { url: `http://127.0.0.1:${srv.address().port}/`, close: () => srv.close() };
 }

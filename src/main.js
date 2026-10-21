@@ -10,7 +10,7 @@ const game = new Phaser.Game({
   scale: { mode: Phaser.Scale.FIT, autoCenter: Phaser.Scale.CENTER_BOTH },
   audio: { noAudio: NO_AUDIO },
   loader: LOCAL ? { imageLoadType: "HTMLImageElement" } : undefined,
-  scene: [Boot, Jar],
+  scene: [Boot, Title, Jar],
 });
 document.addEventListener("contextmenu", e => e.preventDefault());
 window.game = game;

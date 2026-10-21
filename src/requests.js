@@ -25,7 +25,7 @@
   // goal(s) -> { ok, p (0..1, notes without a hold), text, icons?, why? }
   const NOTES = [
     {
-      id: "glow", who: "hazel", name: "Hazel", ask: "Make my jar glow?", line: "I've never seen a firefly shine up close.",
+      id: "glow", who: "hazel", name: "Hazel", ask: "Make my jar glow?", line: "I've never seen a firefly shine up close.", thanks: "It glows! I watched Dot all evening.",
       reward: 4, unlock: "speed", hold: 0.05,
       setup(s) { // onboarding stage: stuffy, a bit dry, lamp on, a small moss carpet, 8:38 AM
         s.day = 0.36; s.hum = 47; s.air = 30; s.lamp = true;
@@ -39,7 +39,7 @@
       },
     },
     {
-      id: "moss", who: "mole", name: "Mo", ask: "Moss on 40% of the floor!", line: "So soft! I dream of a moss carpet.",
+      id: "moss", who: "mole", name: "Mo", ask: "Moss on 40% of the floor!", line: "So soft! I dream of a moss carpet.", thanks: "Soft! So soft! My paws are so happy.",
       reward: 4, unlock: "springtail",
       goal(s) {
         const c = Sim.mossTotal(s) / Sim.N;
@@ -47,7 +47,7 @@
       },
     },
     {
-      id: "show", who: "owl", name: "Olive", ask: "3 fireflies glowing for 6 hours!", line: "A little night show for my owlets?",
+      id: "show", who: "owl", name: "Olive", ask: "3 fireflies glowing for 6 hours!", line: "A little night show for my owlets?", thanks: "The owlets loved the light show. Hoo!",
       reward: 6, unlock: "mushroom", hold: 0.25, night: true,
       goal(s) {
         const n = glowing(s), have = Sim.count(s, "firefly");
@@ -55,7 +55,7 @@
       },
     },
     {
-      id: "soggy", who: "frog", name: "Fen", ask: "Mould under 1%, please!", line: "Oops, I dropped soggy leaves in. Sorry!",
+      id: "soggy", who: "frog", name: "Fen", ask: "Mould under 1%, please!", line: "Oops, I dropped soggy leaves in. Sorry!", thanks: "Sorry again about the leaves. You fixed it!",
       reward: 4, unlock: "fern", hold: 0.5,
       setup(s) {
         for (const i of PILES) s.slots[i].det = Math.min(1, s.slots[i].det + 0.5);
@@ -68,7 +68,7 @@
       },
     },
     {
-      id: "full", who: "hazel", name: "Hazel", ask: "Every kind, nobody sad, lid shut, a whole day!", line: "Can your jar look after itself?",
+      id: "full", who: "hazel", name: "Hazel", ask: "Every kind, nobody sad, lid shut, a whole day!", line: "Can your jar look after itself?", thanks: "Your jar looks after itself now. Wonderful.",
       reward: 4, hold: 1,
       goal(s) {
         const st = species(s), kinds = SPECIES.filter(k => st[k].n > 0).length;
@@ -77,7 +77,7 @@
       },
     },
     {
-      id: "party", who: "all", name: "Everyone", ask: "Party! 5 fireflies glowing, every kind here.", line: "We're all coming over at dusk!",
+      id: "party", who: "all", name: "Everyone", ask: "Party! 5 fireflies glowing, every kind here.", line: "We're all coming over at dusk!", thanks: "Best party on the whole windowsill!",
       reward: 0, hold: 0.25, night: true,
       goal(s) {
         const st = species(s), n = glowing(s), kinds = SPECIES.filter(k => st[k].n > 0).length;
@@ -151,7 +151,8 @@
       if (r.hold < n.hold) return ev;
     } else if (!g.ok) return null;
 
-    // note done: reward, unlock, next note
+    // note done: reward, unlock, next note (the day goes on its postcard)
+    (r.days ||= []).push(Math.floor(s.day) + 1);
     s.seeds += n.reward;
     if (n.unlock === "speed") r.perks.push("speed");
     else if (n.unlock) r.shop.push(n.unlock);
