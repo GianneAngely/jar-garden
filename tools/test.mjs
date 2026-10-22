@@ -34,15 +34,15 @@ await sleep(500);
 await shot("1-start.png");
 
 check(await evaluate(`game.scene.getScene("Jar").card.ask.text === "Make my jar glow?"`), "Hazel's first note is on the card");
-check(await evaluate(`jar.lamp === true && game.scene.getScene("Jar").lampBtn.list[1].text === "Lamp on"`), "staged jar: lamp on, button says so");
+check(await evaluate(`jar.lamp === true && game.scene.getScene("Jar").lampBtn.list[1].text === "Lamp off"`), "staged jar: lamp on, its button offers Lamp off");
 check(await evaluate(`!game.scene.getScene("Jar").speedBtn.visible`), "speed button hidden before note 1");
-await click(870 + 156, 556);           // springtail card, locked
-check(await evaluate(`game.scene.getScene("Jar").selected === null && game.scene.getScene("Jar").toastText.text.includes("note 2")`), "locked shop card explains when it opens");
+await click(870 + 156, 556);           // springtail card: locked, and the coach owns the screen
+check(await evaluate(`game.scene.getScene("Jar").selected === null`), "locked shop card does nothing during the onboarding");
 
 // onboarding, played for real at 1x: each beat's prompt, only the pointed control works, glow within ~35 s
 const coach = `game.scene.getScene("Jar").coach.pillText.text`;
 const t0 = Date.now();
-check((await evaluate(coach)).startsWith("Pip can't breathe"), "coach beat 1: open the lid");
+check((await evaluate(coach)).startsWith("Pip the snail can't breathe"), "coach beat 1: open the lid");
 await click(555, 664);                 // Mist is locked for now
 check(await evaluate(`jar.hum < 50`), "locked control (Mist) does nothing during beat 1");
 await click(295, 664);
@@ -53,10 +53,13 @@ check(await evaluate(`jar.lid === false`), "Close lid button");
 await click(555, 664);
 check(await evaluate(`jar.hum >= 54`), "Mist raises humidity");
 check((await evaluate(coach)).startsWith("Add a firefly"), "coach: add a firefly");
-await click(870 + 312, 556 + 84);      // firefly card
+await click(870 + 312, 556 + 84);      // firefly card, tapped twice (used to drop the pick and soft-lock the coach)
+await click(870 + 312, 556 + 84);
+await click(284, 400);                 // a near miss on the glass rim
+check(await evaluate(`game.scene.getScene("Jar").selected === "firefly"`), "double tap / near miss keeps the firefly picked during the coach");
 await click(490, 330);
 check(await evaluate(`Sim.count(jar, "firefly") === 1 && jar.ents.some(e => e.name === "Dot")`), "Dot the firefly is in");
-check(await waitFor(`${coach}.startsWith("Dot hates the lamp")`, 25000), "coach: lamp off at dusk");
+check(await waitFor(`${coach}.startsWith("Dot the firefly hates the lamp")`, 25000), "coach: lamp off at dusk");
 await shot("2-onboarding-dusk.png");
 await click(425, 664);
 check(await evaluate(`jar.lamp === false`), "Lamp button");
@@ -69,6 +72,8 @@ await shot("3-postcard.png");
 if (server) check(await evaluate(`game.renderer.type === Phaser.WEBGL && game.textures.exists("pc-glow")`), "WebGL over http: jar photo taken for the postcard");
 check(await waitFor(`game.scene.getScene("Jar").card.ask.text.startsWith("Moss on 40%") && game.scene.getScene("Jar").speedBtn.visible`, 9000), "postcard, then Mo's note arrives, speed unlocked");
 await shot("3b-note2.png");
+await click(870 + 312, 556);           // fern card, still locked
+check(await evaluate(`game.scene.getScene("Jar").selected === null && game.scene.getScene("Jar").toastText.text.includes("note 4")`), "locked shop card explains when it opens");
 
 await evaluate(`jar.seeds = 40; jar.req.shop = Sim.ANIMALS.concat(["moss", "fern", "mushroom"])`);
 await click(870 + 156, 556);           // springtail card
@@ -96,7 +101,8 @@ await sleep(800);
 await shot("5-night.png");
 check(await evaluate(`jar.ents.some(e => e.kind === "firefly" && e.glow)`), "fireflies glow at night");
 
-// click a creature to see its tooltip
+// click a creature to see its tooltip (nothing picked in the shop, else the tap would place)
+await evaluate(`game.scene.getScene("Jar").select(null)`);
 const sx = await evaluate(`(() => { const e = jar.ents.find(e => e.kind === "snail"); return e && 306 + e.x * 368; })()`);
 if (sx) { await click(sx, 490); check(await evaluate(`game.scene.getScene("Jar").tip.visible`), "tap creature shows tooltip"); }
 await click(1000, 650);

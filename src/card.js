@@ -55,6 +55,7 @@ class NoteCard {
     this.buildIcons(g);
     this.buildPeople(note.who);
     this.shown = 0;
+    if (note.id === "soggy") this.scene.leafFall?.();
   }
 
   drawBox() {
@@ -88,10 +89,10 @@ class NoteCard {
   buildPeople(who) {
     this.people.removeAll(true);
     const keys = who === "all" ? ["hedgehog", "mole", "owl", "frog"] : [WHO[who]];
-    const h = who === "all" ? 150 : PORTRAIT_H;
+    const h = who === "all" ? 132 : PORTRAIT_H;
     keys.forEach((k, i) => {
       const tex = this.scene.textures.get(k).getSourceImage();
-      const x = who === "all" ? 42 + i * 62 : 124;
+      const x = who === "all" ? 52 + i * 54 : 124;
       const im = this.scene.add.image(x, 724, k).setOrigin(0.5, 1).setScale(h / tex.height);
       this.people.add(im);
       im.y += h + 20;
@@ -204,8 +205,9 @@ function postcard(scene, note, day, photo) {
   const cw = tw * (key === "firefly" ? 1 : 0.62), k = 36 / cw, cx = (tw - cw) / 2, cy = key === "firefly" ? 0 : tw * 0.02;
   face.setScale(k).setCrop(cx, cy, cw, cw * 44 / 36).setPosition(sx - 18 - cx * k, sy - 22 - cy * k);
   // postmark rings with the day
-  const pm = scene.add.graphics().lineStyle(2, COL.inkHex, 0.45).strokeCircle(sx - 44, sy + 22, 22).strokeCircle(sx - 44, sy + 22, 16);
-  const pmt = label(scene, sx - 44, sy + 22, `DAY ${day}`, 11, "#7a5a44", 0.5).setAngle(-12).setAlpha(0.8);
+  const mx = px + 30, my = py + ph - 2;
+  const pm = scene.add.graphics().fillStyle(0xfffaf1, 0.92).fillCircle(mx, my, 23).lineStyle(2, COL.inkHex, 0.5).strokeCircle(mx, my, 22).strokeCircle(mx, my, 16);
+  const pmt = label(scene, mx, my, `DAY ${day}`, 11, "#7a5a44", 0.5).setAngle(-12);
   c.add([frame, msg, sig, st, face, pm, pmt]);
   return c;
 }

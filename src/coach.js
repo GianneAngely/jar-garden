@@ -6,14 +6,15 @@ class Coach {
     const sc = (this.scene = scene);
     const btn = b => () => ({ x: b.x, y: b.y - 32 });
     this.steps = [
-      { text: "Pip can't breathe! Open the lid.", at: btn(sc.lidBtn), allow: ["lid"], bar: "air", done: s => s.lid },
+      { text: "Pip the snail can't breathe! Open the lid.", at: btn(sc.lidBtn), allow: ["lid"], bar: "air", done: s => s.lid },
       { text: "Fresh air is coming in...", bar: "air", allow: [], done: s => s.air >= 45 },
       { text: "Close it. Keeps it damp.", at: btn(sc.lidBtn), allow: ["lid"], bar: "air", done: s => !s.lid },
       { text: "Fireflies love damp. Mist!", at: btn(sc.mistBtn), allow: ["mist"], bar: "hum", done: s => s.hum >= 54 },
       { text: "Add a firefly!", at: () => ({ x: sc.cards[SHOP.indexOf("firefly")].x, y: sc.cards[SHOP.indexOf("firefly")].y - 44 }), allow: ["shop:firefly"], done: s => sc.selected === "firefly" || Sim.count(s, "firefly") > 0 },
-      { text: "Tap inside the jar.", at: () => ({ x: JAR.x + JAR.w / 2, y: 330 }), allow: ["shop:firefly", "jar"], done: s => Sim.count(s, "firefly") > 0 },
+      { text: "Tap inside the jar.", at: () => ({ x: JAR.x + JAR.w / 2, y: 330 }), allow: ["shop:firefly", "jar"], done: s => Sim.count(s, "firefly") > 0,
+        back: s => !sc.selected && Sim.count(s, "firefly") === 0 }, // the pick got dropped: point at the card again
       { text: "Dusk is coming...", allow: [], bar: "light", fast: 4, done: s => Sim.isNight(s) || !s.lamp }, // time-lapse the wait
-      { text: "Dot hates the lamp. Lamp off!", at: btn(sc.lampBtn), allow: ["lamp"], bar: "light", done: s => !s.lamp },
+      { text: "Dot the firefly hates the lamp. Lamp off!", at: btn(sc.lampBtn), allow: ["lamp"], bar: "light", done: s => !s.lamp },
       { text: "Watch Dot...", allow: [], done: () => false },
     ];
     this.i = 0;
@@ -28,6 +29,14 @@ class Coach {
     this.arrow.fillStyle(0xffe6a8).lineStyle(3, COL.inkHex)
       .beginPath().moveTo(0, 0).lineTo(-18, -20).lineTo(-8, -20).lineTo(-8, -40).lineTo(8, -40).lineTo(8, -20).lineTo(18, -20).closePath().fillPath().strokePath();
     if (this.active) sc.tweens.add({ targets: this.ui, alpha: 1, delay: 500, duration: 400 });
+  }
+
+  // end the onboarding now (tests and recorded scenes that start mid-story)
+  finish() {
+    this.active = false;
+    this.scene.tweens.killTweensOf(this.ui);
+    this.ui.setAlpha(0);
+    this.glow.clear();
   }
 
   // back to beat 1 (Rewind into note 1)
@@ -65,6 +74,7 @@ class Coach {
       return;
     }
     while (this.i < this.steps.length - 1 && this.steps[this.i].done(s)) this.i++;
+    if (this.steps[this.i].back?.(s)) this.i--;
     const st = this.steps[this.i];
     if (this.pillText.text !== st.text) this.say(st.text);
     const t = st.at?.();
@@ -79,7 +89,7 @@ class Coach {
     this.pillText.setPosition(this.pillBg.x, py);
     // soft pulse behind the panel bar this beat moves
     const g = this.glow.clear(), row = { hum: 0, air: 1, light: 2 }[st.bar];
-    if (row != null) g.fillStyle(0xffe6a8, 0.45 + 0.25 * Math.sin(time / 200)).fillRoundedRect(780, 104 + row * 38 - 17, 466, 34, 12);
+    if (row != null) g.fillStyle(0xffe6a8, 0.45 + 0.25 * Math.sin(time / 200)).fillRoundedRect(780, barY(row) - 17, 466, 34, 12);
   }
 
   say(text) {

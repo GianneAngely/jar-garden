@@ -78,7 +78,7 @@
       s.slots[i].moss = Math.max(s.slots[i].moss, 0.35);
       s.slots[i].mould *= 0.5;
     } else {
-      spawn(s, kind, x, y);
+      spawn(s, kind, kind === "fern" ? clamp(x, 0.12, 0.88) : x, y); // fern fronds would poke through the curved walls
     }
     return { ok: true };
   }
@@ -228,7 +228,10 @@
       e.food = clamp(e.food);
       e.hp = clamp(e.hp + (why.length ? -0.45 : 0.3) * dt);
       e.why = why[0] || "";
-      e.mood = why.length ? "sad" : e.hp > 0.7 ? "happy" : "ok";
+      // a cleaner whose only trouble is hunger is "ok", not "sad": it still loses hp and earns no seed, but no verb
+      // fixes its food, so it must not block a "nobody sad" note (M3d)
+      const peckish = why.length === 1 && (why[0] === "nothing to eat" || (why[0] === "hungry" && e.kind === "springtail"));
+      e.mood = why.length && !peckish ? "sad" : !why.length && e.hp > 0.7 ? "happy" : "ok";
       if (breed && (counts[e.kind] || 0) + born.filter(b => b.kind === e.kind).length < CAP[e.kind]) {
         born.push({ kind: e.kind, x: e.x + (rand(s) - 0.5) * 0.1, y: e.y });
         e.food -= 0.35;
@@ -241,7 +244,7 @@
       const i = slotOf(e.x);
       s.slots[i].det = clamp(s.slots[i].det + (e.kind === "springtail" ? 0.05 : 0.4));
       s.died++;
-      if (e.kind !== "springtail") note(s, `A ${KINDS[e.kind].name.toLowerCase()} died (${e.why || "old age"}).`);
+      if (e.kind !== "springtail" || !s.ents.some(o => o.kind === "springtail" && o.hp > 0)) note(s, `A ${KINDS[e.kind].name.toLowerCase()} died (${e.why || "old age"}).`);
     }
     s.ents = s.ents.filter(e => e.hp > 0);
     for (const b of born) {
@@ -271,7 +274,7 @@
     if (mossTotal(s) >= MOSS_PAY) kinds.add("moss");
     s.lastPay = { day: Math.floor(s.day) + 1, kinds: [...kinds] };
     s.seeds += kinds.size;
-    note(s, `Day ${Math.floor(s.day) + 1}: +${kinds.size} seeds.`);
+    note(s, `Day ${Math.floor(s.day) + 1}: +${kinds.size} seed${kinds.size === 1 ? "" : "s"}.`);
   }
 
   const api = { MOSS_PAY, N, KINDS, ANIMALS, CAP, create, tick, place, setLid, setLamp, mist, light, isNight, count, mossTotal, mouldTotal, slotOf, slotX };

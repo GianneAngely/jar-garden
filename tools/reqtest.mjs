@@ -85,6 +85,7 @@ const P = {
 };
 const looker = fn => (s, pm) => { if (s.day - (pm.look ?? -9) >= 0.05) { pm.look = s.day; fn(s, pm); } }; // looks every 3 s at 1x
 const delayed = (fn, d) => (s, pm) => { pm.d0 ??= s.day; if (s.day - pm.d0 >= d) fn(s, pm); };
+const mistake = (bad, d, fn) => (s, pm) => { pm.m0 ??= s.day; if (s.day - pm.m0 < d) bad(s, pm); else fn(s, pm); }; // bad for d days, then fn
 
 // 1. Onboarding: first glow early, the firefly never sad, humidity >= 55 when it goes in
 for (const [label, r, late, maxSec] of [["quick 1x", 1, 0, 35], ["slow 2x", 2, 0, 45], ["very slow 3x", 3, 0, 60], ["closes lid 12 s late", 1, 12, 45]]) {
@@ -126,6 +127,8 @@ for (const id of ORDER) check(days[id].every(d => d != null), `note ${id.padEnd(
 const tots = arc.map(a => a.tot).sort((a, b) => a - b);
 check(arc.length === SEEDS.length && tots[tots.length >> 1] < 8,
   `whole arc ${arc.length}/${SEEDS.length} won, median ${tots[tots.length >> 1]?.toFixed(2)} d, deaths max ${Math.max(...arc.map(a => a.s.died))}, seeds left median ${arc.map(a => a.s.seeds).sort((a, b) => a - b)[arc.length >> 1]}`);
+// M3d: the 3.9 d party outlier was a hungry springtail / starving baby mushroom blocking "nobody sad"
+check(Math.max(...days.party) <= 1.2, `note party arc tail: max ${Math.max(...days.party).toFixed(2)} d (<= 1.2, was 3.92)`);
 
 // 3. Per note, from each player's real start jar: careful players finish, wrong or idle ones don't
 const from = (id, fn, d) => snaps[id].map(sn => play(structuredClone(sn), fn, d));
@@ -143,9 +146,12 @@ for (const [id, name, fn, d, expect] of [
   ["full", "engaged, looks every 3 s", looker(P.full.engaged), 5, true],
   ["full", "lamp on at night", P.full.lampNight, 4, false],
   ["full", "idle", P.full.idle, 4, false],
+  ["full", "lid left open 1 d, then engaged", mistake(s => Sim.setLid(s, true), 1, P.full.engaged), 3, true], // M3d: was 18/20 in 3 d (max 6.41 d)
   ["party", "engaged, looks every 3 s", looker(P.party.engaged), 5, true],
   ["party", "lamp on", P.party.lampOn, 4, false],
   ["party", "idle (lamp off)", P.party.idle, 4, false],
+  ["party", "lid left open 1 d, then engaged", mistake(s => Sim.setLid(s, true), 1, P.party.engaged), 3, true], // M3d: was 13/20 in 3 d (max 6.96 d)
+  ["party", "2nd springtail first, then engaged", (s, pm) => { pm.sp ??= cnt(s, "springtail") < 2 && Req.place(s, "springtail", 0.7); P.party.engaged(s, pm); }, 3, true], // M3d: was 15/20 in 3 d (19/20 in 20 d)
 ]) {
   const r = from(id, fn, d), n = r.filter(x => x != null).length;
   check(expect ? n === r.length : n === 0, `note ${id.padEnd(5)} ${name.padEnd(36)} ${stats(r)}${expect ? "" : ` in ${d} d`}`);
@@ -162,6 +168,24 @@ for (const [id, name, fn, d, expect] of [
   const idle = run(() => {}, 10), open = run(s => Sim.setLid(s, true), 10);
   check(idle.every(x => x == null), `lose: idle jar never loses in 10 d (${idle.filter(Boolean).length}/20)`);
   check(open.every(x => x != null), `lose: lid left open loses within 10 d (${open.filter(Boolean).length}/20), tip "${open.find(Boolean)}"`);
+}
+
+// 5. M3d: a springtail or mushroom whose only trouble is hunger is never "sad", but it still starves and earns no seed
+{
+  const s = Sim.create(5);
+  s.ents = []; s.seeds = 5; s.hum = 70;
+  for (const sl of s.slots) Object.assign(sl, { moss: 0, mould: 0, det: 0 });
+  Sim.place(s, "springtail", 0.5); Sim.place(s, "mushroom", 0.3);
+  for (const e of s.ents) e.food = 0.1;
+  let sad = 0, paid = 0;
+  for (let k = 0; k < 3 / DT; k++) {
+    const day = Math.floor(s.day);
+    Sim.tick(s, DT);
+    sad += s.ents.filter(e => e.mood === "sad").length;
+    if (Math.floor(s.day) !== day) paid += s.lastPay.kinds.length;
+  }
+  check(sad === 0 && paid === 0 && s.ents.length === 0 && s.log.some(l => l.text.includes("nothing to eat")),
+    `hungry cleaners: sad ticks ${sad}, seeds paid ${paid}, alive after 3 d ${s.ents.length} (starved, never sad, no seed)`);
 }
 
 console.log(fail ? `${fail} FAILED` : "ALL OK");

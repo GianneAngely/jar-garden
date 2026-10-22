@@ -74,3 +74,59 @@ Tes: `node tools/test.mjs` (27/27, file:// Canvas) sama `node tools/test.mjs --h
 - Logo sama tetangga masih pilihan sementara, nunggu Angel milih (lembar A/B/C udah dikirim).
 - Kanan layar judul masih kosong (dinding). Mungkin nanti ditaruh kredit kecil atau tanaman gantung bergoyang.
 - Belum ada musik di layar judul (itu M4).
+
+## M3d Ekonomi biji + perbaikan dari playtest (22 Okt)
+GIF: `docs/m3/m3d-economy.gif` (tengah malam: biji naik dari makhluk yang bahagia terus terbang ke penghitung, kunang-kunang yang ngambek dapet "no seed"; Fen datang, daun jatuh, bar Mould di-zoom)
+
+Proses: audit 3 analis pakai sim node (pilihan beli, pemain nyangkut/softlock, awal game + free play), terus digabung jadi daftar perubahan, terus diverifikasi 2 verifikator di salinan sim. Playtest 4 persona di Chrome headless (mute): juri capek, maniak sim, pemain cozy sampai tamat, pemburu bug.
+
+Tes: request 37/37 (ada 5 cek baru), sim 9/9, UI 28/28.
+
+**Temuan ekonomi:**
+- Uang cuma kerasa di catatan 2 (lumut, plus pilihan lampu) sama catatan 3 (beli kunang-kunang). Dari catatan 4 ke atas, waktunya ditentuin sama hold (0,5 hari, 1 hari, satu malam), bukan sama biji. Ga ada softlock.
+- Masalah terbesar: springtail atau jamur yang cuma lapar bikin syarat "nobody sad" gagal, dan pemain ga punya cara buat ngasih makan. Akibatnya catatan pesta bisa nyangkut sampai 3,9 hari, bahkan 5,9 di 300 run, dan biji numpuk sia-sia.
+- Perubahan yang dipakai (1 baris sim): makhluk pembersih yang masalahnya cuma lapar sekarang moodnya "ok". HP-nya tetap turun dan dia tetap ga dapet biji.
+  - Hasilnya: pesta maks 0,9 hari, 300/300 menang, 0 kematian.
+  - Biji maksimum yang numpuk di tangan turun dari 37 ke 18.
+- Usul yang ditolak, semuanya udah dites:
+  - tukar hadiah Mo/Olive
+  - jamur jadi 2 biji
+  - batas biji 30
+  - kunang-kunang jadi 5 biji
+
+**Udah enak (kata playtest):**
+- Keempat persona senyum di 60 detik pertama. Momen paling disuka: kunang-kunang nyala, sama kartu pos berisi foto toples sendiri.
+- Gelembung mood kebaca tanpa teks. Grafik 15 hari nyeritain kejadian beneran, misalnya gerigi gara-gara kabut terus-terusan atau udara turun gara-gara kebanyakan siput.
+
+**Belum enak, udah dibenerin:**
+- Onboarding bisa nyangkut kalau kartu kunang-kunang diketuk dua kali atau ketukannya meleset dikit dari kaca. Sekarang pilihan tetap kepegang, coach balik ke "Add a firefly!", dan ada tesnya.
+- Warna bar ga cocok sama mood (Fresh air merah padahal toples sehat). Sekarang zona hijaunya ngikut ambang sim buat makhluk yang ada, dan angka jadi merah kalau ada makhluk yang sedih karena bar itu.
+- Biji muncul tanpa sebab. Sekarang ada:
+  - preview "+N at midnight" di samping penghitung biji
+  - biji naik dari tiap jenis yang bahagia terus terbang ke penghitung
+  - tulisan "no seed" di atas makhluk yang ngambek
+  - baris sebab di bawah Humidity sama Fresh air (misalnya "▲ plants ▼ animals")
+- Catatan 3 sempat kosong lama karena biji kurang. Sekarang ada chip "More seeds at midnight. Try 4x!".
+- Catatan Fen susah kebaca. Sekarang daun sama jamur busuk digambar di atas lumut dan lebih gede, daun jatuh pas Fen datang, bar Mould di-zoom 0–20% dengan garis 1%, dan teksnya "Mould 1.1% · need < 1%".
+- Ketukan yang kena makhluk pas lagi mau nanam malah buka tooltip. Sekarang ketukannya tetap nanam, dan tooltip hilang sendiri setelah 3 detik.
+- Hal-hal kecil lain:
+  - toast diem selama onboarding
+  - Pip sama Dot dikenalin namanya di kalimat coach
+  - tombol lampu nulis aksinya ("Lamp off")
+  - tutup toples ga nyelip lagi di bawah panel
+  - waktu berhenti selama ucapan makasih atau overlay
+  - Space ga bisa unpause dari balik overlay
+  - tombol overlay baru aktif setelah muncul penuh
+  - pilihan toko di-reset pas Rewind
+  - pakis ga nembus dinding
+  - tips kalah ngikut keadaan toples ("An open lid dries the jar...")
+  - kematian springtail terakhir masuk log
+  - "+1 seed" (tunggal)
+  - grafik baru digambar setelah 5 sampel
+  - gate jam ga ngerusak riwayat grafik lagi
+
+**Masih kurang (masuk M4/M5):**
+- Momen nyala kunang-kunang masih kecil. Butuh bloom lebih gede, hati keluar dari Dot, sama suara.
+- Kunang-kunang suka numpuk di satu titik. Bayi siput lahir langsung ukuran penuh. Mould masih kayak oval abu-abu.
+- Setelah menang, biji numpuk dan ga ada yang bisa dibeli (sink buat free play).
+- HP posisi portrait jadi strip kecil. Butuh kartu "putar HP" sama embed itch landscape (M5).

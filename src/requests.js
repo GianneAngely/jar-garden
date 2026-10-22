@@ -21,6 +21,8 @@
   }
   const kindIcons = st => SPECIES.map(k => ({ key: k, on: st[k].n > 0, sad: st[k].sad > 0 }));
   const why = s => { const e = sadOne(s); return e ? `${nameOf(e)}: ${e.why}` : ""; };
+  // the note needs more fireflies than the seeds can buy right now: say where seeds come from
+  const short = (s, have, need) => (have < need && s.seeds < Sim.KINDS.firefly.cost ? "More seeds at midnight. Try 4x!" : "");
 
   // goal(s) -> { ok, p (0..1, notes without a hold), text, icons?, why? }
   const NOTES = [
@@ -34,7 +36,7 @@
       goal(s) {
         const ff = s.ents.find(e => e.kind === "firefly");
         const ok = !!ff && ff.glow && ff.mood !== "sad" && !s.lamp;
-        const text = ok ? "Glowing!" : !ff ? "Add a firefly" : !night(s) ? "Wait for the dark" : s.lamp ? "Turn the lamp off" : "Almost...";
+        const text = ok ? "Glowing!" : !ff ? "Follow the arrows" : !night(s) ? "Wait for the dark" : s.lamp ? "Turn the lamp off" : "Almost...";
         return { ok, p: ok ? 1 : ff ? 0.5 : 0, text, why: ff && ff.mood === "sad" ? `${nameOf(ff)}: ${ff.why}` : "" };
       },
     },
@@ -43,7 +45,7 @@
       reward: 4, unlock: "springtail",
       goal(s) {
         const c = Sim.mossTotal(s) / Sim.N;
-        return { ok: c >= 0.4, p: Math.min(1, c / 0.4), text: `Moss ${Math.round(c * 100)}% / 40%`, dots: s.slots.map(sl => sl.moss) };
+        return { ok: c >= 0.4, p: Math.min(1, c / 0.4), text: `Moss ${Math.round(c * 100)}% / 40%`, dots: s.slots.map(sl => sl.moss), hint: "Plant moss: light + damp grow it" };
       },
     },
     {
@@ -51,7 +53,7 @@
       reward: 6, unlock: "mushroom", hold: 0.25, night: true,
       goal(s) {
         const n = glowing(s), have = Sim.count(s, "firefly");
-        return { ok: n >= 3, text: night(s) ? `${Math.min(n, 3)}/3 glowing` : `${Math.min(have, 3)}/3 fireflies`, pips: { n: night(s) ? n : have, of: 3 }, why: why(s) };
+        return { ok: n >= 3, text: night(s) ? `${Math.min(n, 3)}/3 glowing` : `${Math.min(have, 3)}/3 fireflies`, pips: { n: night(s) ? n : have, of: 3 }, why: why(s), hint: short(s, have, 3) };
       },
     },
     {
@@ -64,7 +66,7 @@
       },
       goal(s) {
         const m = mouldPct(s);
-        return { ok: m < 1, text: `Mould ${m < 10 ? m.toFixed(1) : Math.round(m)}% (under 1%)`, hint: "Open the lid, or mushrooms on the leaves" };
+        return { ok: m < 1, text: `Mould ${m < 10 ? (Math.ceil(m * 10) / 10).toFixed(1) : Math.round(m)}% · need < 1%`, hint: "Open lid or add mushrooms" };
       },
     },
     {
@@ -82,7 +84,7 @@
       goal(s) {
         const st = species(s), n = glowing(s), kinds = SPECIES.filter(k => st[k].n > 0).length;
         const have = night(s) ? n : Sim.count(s, "firefly");
-        return { ok: n >= 5 && kinds === 6 && !sadOne(s), text: `${Math.min(have, 5)}/5 ${night(s) ? "glowing" : "fireflies"} · ${kinds}/6 kinds`, pips: { n: have, of: 5 }, icons: kindIcons(st), why: why(s) };
+        return { ok: n >= 5 && kinds === 6 && !sadOne(s), text: `${Math.min(have, 5)}/5 ${night(s) ? "glowing" : "fireflies"} · ${kinds}/6 kinds`, pips: { n: have, of: 5 }, icons: kindIcons(st), why: why(s), hint: short(s, Sim.count(s, "firefly"), 5) };
       },
     },
   ];
@@ -107,12 +109,12 @@
   }
   const current = s => (s.req && !s.req.won ? NOTES[s.req.i] : null);
 
-  // Clock gates during note 1 (onboarding): hold 4:48 PM until a firefly is in, hold 9:36 PM until the lamp is off,
+  // Clock gates during note 1 (onboarding): hold 4:33 PM until a firefly is in, hold 9:21 PM until the lamp is off,
   // so a slow reader still gets the first glow. Call right after Sim.tick.
   function gate(s, dt) {
     if (current(s)?.id !== "glow") return;
     const ff = Sim.count(s, "firefly") > 0, f = s.day % 1;
-    if ((!ff && f > 0.70) || (ff && s.lamp && f > 0.90)) s.day -= dt;
+    if ((!ff && f > 0.69) || (ff && s.lamp && f > 0.89)) s.day -= dt; // 0.69/0.89: off the 0.1-day graph sample line
   }
 
   // Advance the active note after a sim step. Returns an event or null:
@@ -125,7 +127,7 @@
 
     // lose: no animal alive for a whole day
     const animals = s.ents.some(e => Sim.ANIMALS.includes(e.kind));
-    if (animals) r.quiet = 0;
+    if (animals || current(s)?.id === "glow") r.quiet = 0; // no losing during the onboarding
     else {
       const was = r.quiet;
       r.quiet += dt;
@@ -133,7 +135,8 @@
       if (r.quiet >= 1) {
         r.lost = true;
         const m = s.log.map(l => l.text.match(/died \((.+)\)/)).find(Boolean);
-        return { type: "lose", tip: TIPS[m?.[1]] || TIPS["old age"] };
+        const tip = m?.[1] === "too dry" && s.lid ? "An open lid dries the jar. Close it, then mist." : TIPS[m?.[1]] || TIPS["old age"];
+        return { type: "lose", tip };
       }
     }
 
@@ -162,6 +165,13 @@
     return { type: "done", note: n };
   }
 
+  // who would pay a seed if midnight came now (the sim's payday rule): happy kinds, plus moss at 25% cover
+  function paying(s) {
+    const kinds = new Set(s.ents.filter(e => e.mood === "happy").map(e => e.kind));
+    if (Sim.mossTotal(s) >= Sim.MOSS_PAY) kinds.add("moss");
+    return [...kinds];
+  }
+
   // the shop only sells what the notes have unlocked so far
   const canBuy = (s, kind) => !s.req || s.req.shop.includes(kind);
   const place = (s, kind, x, y) => (canBuy(s, kind) ? Sim.place(s, kind, x, y) : { ok: false, why: "not in the shop yet" });
@@ -174,7 +184,7 @@
     return { note: n, goal: g, p: n.hold ? Math.min(1, s.req.hold / n.hold) : g.p, paused: !!n.night && !night(s) };
   }
 
-  const api = { NOTES, SPECIES, START_SHOP, TIPS, create, current, gate, update, progress, species, glowing, canBuy, place };
+  const api = { NOTES, SPECIES, START_SHOP, TIPS, PILES, create, current, gate, update, progress, species, glowing, canBuy, place, paying };
   if (typeof module !== "undefined") module.exports = api;
   else root.Req = api;
 })(this);

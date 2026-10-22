@@ -20,6 +20,8 @@ const clock = day => {
   const m = Math.floor((day % 1) * 24 * 60), h = Math.floor(m / 60);
   return `${(h + 11) % 12 + 1}:${String(m % 60).padStart(2, "0")} ${h < 12 ? "AM" : "PM"}`;
 };
+const barY = i => 102 + i * 44; // panel bar rows (room under Humidity and Fresh air for their cause line)
+const FLUX_NAME = { lid: "open lid", plants: "plants", animals: "animals", mould: "mould", glass: "glass" };
 const hash = (a, b) => { const x = Math.sin(a * 127.1 + b * 311.7) * 43758.5453; return x - Math.floor(x); };
 
 function label(scene, x, y, str, size = 22, color = COL.ink, origin = 0) {
@@ -92,14 +94,12 @@ class Jar extends Phaser.Scene {
     soilImg.setDisplaySize(JAR.w + 30, JAR.y + JAR.h - JAR.soil + 10).setMask(mask.createGeometryMask());
 
     // per-slot soil life: leftovers, moss, mould (pooled images, scaled each frame)
-    this.slotViews = this.s.slots.map((_, i) => {
-      const x = jx(Sim.slotX(i)), flip = hash(i, 7) < 0.5;
-      return {
-        leaves: this.add.image(x, JAR.soil + 3, "leaves").setOrigin(0.5, 1).setFlipX(flip).setVisible(false),
-        moss: this.add.image(x, JAR.soil + 5, "moss").setOrigin(0.5, 1).setFlipX(flip).setVisible(false),
-        mould: this.add.image(x, JAR.soil + 4, "mould").setOrigin(0.5, 1).setFlipX(!flip).setVisible(false),
-      };
-    });
+    // drawn in layers: every moss tuft first, then leftovers and mould on top, so a leaf pile or a mould patch
+    // never hides under the carpet
+    const at = i => ({ x: jx(Sim.slotX(i)), flip: hash(i, 7) < 0.5 });
+    this.slotViews = this.s.slots.map((_, i) => ({ moss: this.add.image(at(i).x, JAR.soil + 5, "moss").setOrigin(0.5, 1).setFlipX(at(i).flip).setVisible(false) }));
+    this.slotViews.forEach((v, i) => { v.leaves = this.add.image(at(i).x, JAR.soil + 6, "leaves").setOrigin(0.5, 1).setFlipX(at(i).flip).setVisible(false); });
+    this.slotViews.forEach((v, i) => { v.mould = this.add.image(at(i).x, JAR.soil + 6, "mould").setOrigin(0.5, 1).setFlipX(!at(i).flip).setVisible(false); });
     this.ents = this.add.layer();
     this.night = this.add.rectangle(0, 0, W, H, COL.night, 0).setOrigin(0);
     this.lamp = this.add.image(JAR.x - 10, 0, "lamp").setOrigin(0.5, 0).setScale(0.5);
@@ -124,9 +124,11 @@ class Jar extends Phaser.Scene {
     this.card = new NoteCard(this);
     this.coach = new Coach(this);
     this.thanks = [];
+    this.pendingSeeds = 0;
+    this.lastPayShown = this.s.lastPay?.day;
     this.syncButtons();
     this.input.on("pointerdown", (p, over) => this.tapJar(p, over));
-    this.input.keyboard?.on("keydown-SPACE", () => this.speedBtn.visible && this.cycleSpeed());
+    this.input.keyboard?.on("keydown-SPACE", () => this.speedBtn.visible && !this.modal && this.cycleSpeed());
     this.input.keyboard?.on("keydown-ESC", () => this.select(null));
     window.STATE = "jar";
   }
@@ -164,6 +166,7 @@ class Jar extends Phaser.Scene {
     this.lampBtn = button(this, cx - 65, y, 122, 40, "Lamp off", "bulb", live("lamp", () => this.toggleLamp()));
     this.mistBtn = button(this, cx + 65, y, 122, 40, "Mist", "spray", live("mist", () => { Sim.mist(this.s); this.puff(); this.say("Pssst! +10 humidity"); }));
     this.speedBtn = button(this, cx + 195, y, 122, 40, "▶ 1x", null, live("speed", () => this.cycleSpeed()));
+    for (const b of [this.lidBtn, this.lampBtn, this.mistBtn, this.speedBtn]) b.setDepth(35); // above the party portraits
   }
 
   buildPanel() {
@@ -178,16 +181,22 @@ class Jar extends Phaser.Scene {
       .on("pointerup", () => this.muteBtn.setText(Audio.toggle(this.game) ? "🔇" : "🔊"));
 
     this.bars = this.add.graphics();
+    // green zones follow the sim's own thresholds for whoever lives in the jar; a number turns red when it is out
+    // of its zone or when any creature is sad because of it, so red always means someone is suffering
     this.barDefs = [
-      { key: "hum", name: "Humidity", col: COL.hum, good: [45, 85] },
-      { key: "air", name: "Fresh air", col: COL.air, good: [50, 100] },
-      { key: "light", name: "Light", col: COL.light },
+      { key: "hum", name: "Humidity", col: COL.hum, why: ["too dry"] },
+      { key: "air", name: "Fresh air", col: COL.air, good: [35, 100], why: ["stuffy air", "can't breathe"] },
+      { key: "light", name: "Light", col: COL.light, why: ["too dim", "lamp too bright"] },
       { key: "mould", name: "Mould", col: COL.mouldBar, good: [0, 5] },
     ];
     this.barVals = this.barDefs.map((d, i) => {
-      label(this, 792, 104 + i * 38, d.name, 20);
-      return label(this, 1232, 104 + i * 38, "", 20, COL.ink, 1);
+      label(this, 792, barY(i), d.name, 20);
+      return label(this, 1232, barY(i), "", 20, COL.ink, 1);
     });
+    // cause lines: what is pushing humidity and fresh air up or down right now (sim s.flux, per day)
+    this.causeText = ["hum", "air"].map((k, i) => label(this, 916, barY(i) + 20, "", 13, "#7a5a48"));
+    // the next payday, live: which kinds are happy enough to pay a seed at midnight
+    this.payText = label(this, 1100, 84, "", 14, "#7a5a48", 0);
 
     this.graph = this.add.graphics();
     label(this, 792, 272, "last 15 days", 16, "#9a7a66");
@@ -206,15 +215,15 @@ class Jar extends Phaser.Scene {
       const icon = this.add.image(-44, 2, kind).setScale(Math.min(56 / tex.width, 54 / tex.height));
       const name = label(this, -12, -12, Sim.KINDS[kind].name, 18);
       const n = Sim.KINDS[kind].cost;
-      const cost = label(this, -12, 14, n + (n === 1 ? " seed" : " seeds"), 15, "#9a7a66");
+      const cost = label(this, -12, 14, n + (n === 1 ? " seed" : " seeds"), 15, "#7a5a48");
       c.add([bg, icon, name, cost]);
       const unlockAt = Req.NOTES.findIndex(nt => nt.unlock === kind);
-      const lock = label(this, -12, 14, `after note ${unlockAt + 1}`, 15, "#9a7a66");
+      const lock = label(this, -12, 14, `after note ${unlockAt + 1}`, 15, "#7a5a48");
       c.add(lock);
       c.setSize(146, 74).setInteractive({ useHandCursor: true }).on("pointerup", () => {
         if (!Req.canBuy(this.s, kind)) return this.say(`${Sim.KINDS[kind].name} comes with note ${unlockAt + 1}`);
         if (!this.coach.allows("shop:" + kind)) return this.coach.nudge();
-        this.select(this.selected === kind ? null : kind);
+        this.select(this.selected === kind && !this.coach.active ? null : kind);
       });
       c.paint = () => {
         const open = Req.canBuy(this.s, kind), on = this.selected === kind, afford = this.s.seeds >= Sim.KINDS[kind].cost;
@@ -229,12 +238,14 @@ class Jar extends Phaser.Scene {
 
   select(kind) {
     this.selected = kind;
+    this.tip.setVisible(false);
     if (this.coach.active) return; // the coach has its own prompt
     this.say(kind ? `Tap inside the jar to add a ${Sim.KINDS[kind].name.toLowerCase()} · ${Sim.KINDS[kind].blurb}` : "", 0, true);
   }
 
   // short message over the jar; it fades after ms unless sticky (the "tap inside the jar" hint while placing)
   say(str, ms = 2200, sticky = false) {
+    if (str && this.coach?.active) return;
     this.toastText.setText(str).setWordWrapWidth(380).setAlign("center");
     const w = Math.min(410, this.toastText.width + 30), h = this.toastText.height + 16;
     this.toastBg.clear().fillStyle(0xfffdf8, 0.95).lineStyle(2, COL.inkHex).fillRoundedRect(-w / 2, -h / 2, w, h, 14).strokeRoundedRect(-w / 2, -h / 2, w, h, 14);
@@ -255,13 +266,12 @@ class Jar extends Phaser.Scene {
     this.lidBtn.setLabel(this.s.lid ? "Close lid" : "Open lid");
     this.lidBtn.setOn(this.s.lid);
     const { x, y } = this.lidHome;
-    this.tweens.add({ targets: this.lid, x: x + (this.s.lid ? 175 : 0), y: y - (this.s.lid ? 40 : 0), angle: this.s.lid ? 14 : 0, duration: 380, ease: "Back.Out" });
+    this.tweens.add({ targets: this.lid, x: x + (this.s.lid ? 110 : 0), y: y - (this.s.lid ? 52 : 0), angle: this.s.lid ? 12 : 0, duration: 380, ease: "Back.Out" });
   }
 
   toggleLamp() {
     Sim.setLamp(this.s, !this.s.lamp);
-    this.lampBtn.setLabel(this.s.lamp ? "Lamp on" : "Lamp off");
-    this.lampBtn.setOn(this.s.lamp);
+    this.syncButtons();
   }
 
   cycleSpeed() {
@@ -272,8 +282,8 @@ class Jar extends Phaser.Scene {
 
   tapJar(p, over) {
     if (over.length) return;
-    if (!inJar(p.x, p.y)) { this.tip.setVisible(false); if (this.selected) this.select(null); return; }
-    if (!this.selected) return;
+    if (!inJar(p.x, p.y)) { this.tip.setVisible(false); if (this.selected && !this.coach.active) this.select(null); return; }
+    if (!this.selected) { if (this.coach.active) this.coach.nudge(); return; }
     if (!this.coach.allows("jar")) return this.coach.nudge();
     const x = Phaser.Math.Clamp((p.x - JAR.x - 26) / (JAR.w - 52), 0, 1);
     const y = Phaser.Math.Clamp((JAR.soil - 6 - p.y) / AIR_H, 0.25, 0.85);
@@ -289,6 +299,7 @@ class Jar extends Phaser.Scene {
     const w = this.tipText.width + 24;
     this.tipBg.clear().fillStyle(0xfffdf8).lineStyle(2, COL.inkHex).fillRoundedRect(-w / 2, -16, w, 32, 10).strokeRoundedRect(-w / 2, -16, w, 32, 10);
     this.tip.setPosition(x, y - (e.kind === "fern" ? 140 : 80)).setVisible(true);
+    if (this.tipFor !== e.id) this.tipUntil = this.time.now + 3000;
     this.tipFor = e.id;
   }
 
@@ -301,6 +312,7 @@ class Jar extends Phaser.Scene {
     // (unless no animal is alive: Rewind must never bring back a jar that is already lost)
     if (this.s.ents.some(e => Sim.ANIMALS.includes(e.kind))) this.noteSnap = structuredClone(this.s);
     this.thanks.push(ev.note);
+    this.pendingSeeds += ev.note.reward; // they fly in during the thank-you
     if (this.thanks.length === 1) this.thank(0);
   }
 
@@ -325,6 +337,17 @@ class Jar extends Phaser.Scene {
     }));
   }
 
+  // Fen's soggy leaves tumble in from the jar mouth onto the piles the note just dumped there
+  leafFall() {
+    Req.PILES.forEach((slot, i) => {
+      for (let k = 0; k < 2; k++) {
+        const lf = this.add.image(JAR.x + JAR.w / 2 + (hash(i, k) - 0.5) * 120, JAR.y + 20, "leaves").setScale(0.22).setDepth(25).setAngle(hash(k, i) * 360);
+        this.tweens.add({ targets: lf, x: jx(Sim.slotX(slot)), y: JAR.soil - 4, angle: lf.angle + 200, duration: 1100 + hash(i, k + 3) * 500, delay: i * 120 + k * 200,
+          ease: "Sine.In", onComplete: () => this.tweens.add({ targets: lf, alpha: 0, duration: 300, onComplete: () => lf.destroy() }) });
+      }
+    });
+  }
+
   // Photo of the jar for a postcard: hide the floating UI for one frame, read the pixels back, add as a texture.
   // file:// in Canvas mode taints the canvas (no read-back), so there the postcard shows the neighbour instead.
   snapJar(key, done) {
@@ -339,7 +362,45 @@ class Jar extends Phaser.Scene {
     });
   }
 
-  bumpSeeds() {
+  // Midnight payday, made visible: a seed rises from one happy member of each paying kind (the fullest moss tuft
+  // for moss) and flies to the counter; sad animals get a small "no seed" instead.
+  payPops(pay) {
+    const s = this.s, at = [];
+    for (const k of pay.kinds) {
+      if (k === "moss") {
+        let best = 0;
+        s.slots.forEach((sl, i) => { if (sl.moss > s.slots[best].moss) best = i; });
+        at.push([jx(Sim.slotX(best)), JAR.soil - 20]);
+      } else {
+        const e = s.ents.find(o => o.kind === k && o.mood === "happy"), v = e && this.views.get(e.id);
+        if (v) at.push([v.c.x, v.c.y - (k === "firefly" ? 10 : 30)]);
+      }
+    }
+    this.pendingSeeds += pay.kinds.length - at.length; // kinds with no view (just died) still paid
+    this.bumpSeeds(0);
+    at.forEach(([x, y], i) => {
+      this.pendingSeeds++;
+      const sd = this.add.image(x, y, "icon-seed").setScale(0.24).setDepth(55).setAlpha(0);
+      const plus = label(this, x + 16, y - 40, "+1", 16, COL.ink, 0.5).setDepth(55).setAlpha(0);
+      this.tweens.add({ targets: plus, alpha: 1, y: y - 56, duration: 380, delay: i * 160, yoyo: true, hold: 300 });
+      this.tweens.chain({ targets: sd, tweens: [
+        { alpha: 1, y: y - 36, scale: 0.34, duration: 380, delay: i * 160, ease: "Back.Out" },
+        { x: 1102, y: 56, scale: 0.2, duration: 650, delay: 200, ease: "Cubic.In", onComplete: () => { sd.destroy(); plus.destroy(); this.bumpSeeds(); } },
+      ] });
+    });
+    for (const e of s.ents.filter(o => o.mood === "sad" && Sim.ANIMALS.includes(o.kind)).slice(0, 3)) {
+      const v = this.views.get(e.id);
+      if (!v) continue;
+      const t = label(this, v.c.x, v.c.y - 50, "no seed", 14, "#9a7a66", 0.5).setDepth(55);
+      this.tweens.add({ targets: t, y: t.y - 24, alpha: 0, delay: 500, duration: 1400, onComplete: () => t.destroy() });
+    }
+  }
+
+  // one seed landed on the counter (n = 1), or just re-show it; the counter lags the sim by the seeds still flying
+  bumpSeeds(n = 1) {
+    this.pendingSeeds = Math.max(0, this.pendingSeeds - n);
+    this.seedText.setText(String(Math.max(0, this.s.seeds - this.pendingSeeds)));
+    if (!n) return;
     this.tweens.killTweensOf(this.seedText);
     this.seedText.setScale(1.35);
     this.tweens.add({ targets: this.seedText, scale: 1, duration: 260, ease: "Back.Out" });
@@ -352,6 +413,9 @@ class Jar extends Phaser.Scene {
     for (const v of this.views.values()) v.c.destroy();
     this.views.clear();
     this.tip.setVisible(false);
+    this.select(null);
+    this.pendingSeeds = 0;
+    this.lastPayShown = s.lastPay?.day;
     this.syncButtons();
     this.card.noteId = null;
     this.coach.reset();
@@ -362,24 +426,41 @@ class Jar extends Phaser.Scene {
     const s = this.s;
     this.lidBtn.setLabel(s.lid ? "Close lid" : "Open lid");
     this.lidBtn.setOn(s.lid);
-    this.lid.setPosition(this.lidHome.x + (s.lid ? 175 : 0), this.lidHome.y - (s.lid ? 40 : 0)).setAngle(s.lid ? 14 : 0);
-    this.lampBtn.setLabel(s.lamp ? "Lamp on" : "Lamp off");
+    this.lid.setPosition(this.lidHome.x + (s.lid ? 110 : 0), this.lidHome.y - (s.lid ? 52 : 0)).setAngle(s.lid ? 12 : 0);
+    this.lampBtn.setLabel(s.lamp ? "Lamp off" : "Lamp on"); // the action, like the lid button; yellow = lamp is on
     this.lampBtn.setOn(s.lamp);
+    this.lampBtn.list[2].setAlpha(s.lamp ? 1 : 0.45);
     this.speedBtn.setVisible(s.req.perks.includes("speed"));
   }
 
   // a centred card over a dim screen, used for lose and (until M3c) the win
   overlay(title, body, btnText, onTap) {
-    this.speedIdx = SPEEDS.length - 1; // pause
-    const o = this.add.container(0, 0).setDepth(70);
+    const o = this.openModal();
     const dim = this.add.rectangle(0, 0, W, H, 0x2b2036, 0.45).setOrigin(0).setInteractive();
     const g = this.add.graphics().fillStyle(COL.card).lineStyle(4, COL.inkHex).fillRoundedRect(W / 2 - 230, 210, 460, 260, 22).strokeRoundedRect(W / 2 - 230, 210, 460, 260, 22);
     const t = label(this, W / 2, 260, title, 30, COL.ink, 0.5);
     const b = this.add.text(W / 2, 320, body, { fontFamily: FONT, fontSize: "19px", color: COL.ink, align: "center", wordWrap: { width: 400 } }).setOrigin(0.5, 0.5);
-    const btn = button(this, W / 2, 415, 180, 46, btnText, null, () => { o.destroy(); onTap(); });
+    const btn = button(this, W / 2, 415, 180, 46, btnText, null, () => { this.closeModal(o); onTap(); });
     o.add([dim, g, t, b, btn]);
-    o.setAlpha(0);
-    this.tweens.add({ targets: o, alpha: 1, duration: 300 });
+    this.armButtons([btn]);
+  }
+
+  // modal overlays: the jar holds still, toasts/tips/selection clear, buttons only take taps once faded in
+  openModal() {
+    this.modal = true;
+    this.say("");
+    this.select(null);
+    const o = this.add.container(0, 0).setDepth(70).setAlpha(0);
+    this.tweens.add({ targets: o, alpha: 1, duration: 350 });
+    return o;
+  }
+  closeModal(o) {
+    o.destroy();
+    this.modal = false;
+  }
+  armButtons(btns) {
+    btns.forEach(b => b.disableInteractive());
+    this.time.delayedCall(600, () => btns.forEach(b => b.setInteractive({ useHandCursor: true })));
   }
 
   showLose(tip) {
@@ -387,14 +468,13 @@ class Jar extends Phaser.Scene {
       this.loadJar(structuredClone(this.noteSnap));
       this.speedIdx = 0;
       this.speedBtn.setLabel("▶ 1x");
-      this.say("Back to the start of this note.");
+      this.say(this.s.req.won ? "Back to your last postcard." : "Back to the start of this note.");
     });
   }
 
   // The end: every postcard from the six notes in a row (photos of your jar over the whole story), a few numbers
   showWin() {
-    this.speedIdx = SPEEDS.length - 1;
-    const s = this.s, o = this.add.container(0, 0).setDepth(70);
+    const s = this.s, o = this.openModal();
     const dim = this.add.rectangle(0, 0, W, H, 0x2b2036, 0.5).setOrigin(0).setInteractive();
     const g = this.add.graphics().fillStyle(COL.card).lineStyle(4, COL.inkHex).fillRoundedRect(130, 70, 1020, 580, 26).strokeRoundedRect(130, 70, 1020, 580, 26);
     o.add([dim, g, label(this, W / 2, 124, "Party night!", 40, COL.ink, 0.5), label(this, W / 2, 168, "Your neighbours sent you six postcards.", 20, "#9a7a66", 0.5)]);
@@ -405,16 +485,18 @@ class Jar extends Phaser.Scene {
       this.tweens.add({ targets: pc, alpha: 1, y: 336, delay: 300 + i * 140, duration: 420, ease: "Back.Out" });
     });
     const kinds = Req.SPECIES.filter(k => Req.species(s)[k].n > 0).length;
-    o.add(label(this, W / 2, 506, `${Math.floor(s.day) + 1} days · ${s.born} babies born · ${kinds} kinds living together`, 20, COL.ink, 0.5));
-    o.add(button(this, W / 2, 580, 220, 50, "Keep playing", null, () => { o.destroy(); this.speedIdx = 0; this.speedBtn.setLabel("▶ 1x"); }));
-    o.setAlpha(0);
-    this.tweens.add({ targets: o, alpha: 1, duration: 400 });
+    const days = s.req.days?.at(-1) ?? Math.floor(s.day) + 1;
+    o.add(label(this, W / 2, 506, `${days} days · ${s.born} ${s.born === 1 ? "baby" : "babies"} born · ${kinds} kinds living together`, 20, COL.ink, 0.5));
+    const keep = button(this, W / 2, 580, 220, 50, "Keep playing", null, () => this.closeModal(o));
+    o.add(keep);
+    this.armButtons([keep]);
   }
 
   // Frame --------------------------------------------------------------------
   update(time, delta) {
     const sp = this.coach.fast || SPEEDS[this.speedIdx];
     this.acc += (delta / 1000) * sp / DAY_SECONDS;
+    if (this.thanks.length || this.modal) this.acc = 0; // the jar holds still during a thank-you or an overlay
     for (let n = 0; this.acc >= DT && n < 60 && !this.s.req.lost; n++) {
       Sim.tick(this.s, DT);
       Req.gate(this.s, DT);
@@ -439,12 +521,12 @@ class Jar extends Phaser.Scene {
     const sw = (JAR.w - 52) / Sim.N;
     this.s.slots.forEach((sl, i) => {
       const v = this.slotViews[i];
-      v.leaves.setVisible(sl.det > 0.05).setScale(0.12 + sl.det * 0.16);
+      v.leaves.setVisible(sl.det > 0.05).setScale(0.14 + sl.det * 0.34);
       const m = sl.moss;
       v.moss.setVisible(m > 0.01);
       if (m > 0.01) v.moss.setScale((sw * (2 + m * 1.8)) / 220, 0.16 + m * 0.5 + Math.sin(time / 900 + i) * 0.006).setAlpha(0.75 + m * 0.25);
       v.mould.setVisible(sl.mould > 0.02);
-      if (sl.mould > 0.02) v.mould.setScale((sw * (1.2 + sl.mould * 2.2)) / 200, 0.12 + sl.mould * 0.32);
+      if (sl.mould > 0.02) v.mould.setScale((sw * (1.6 + sl.mould * 3)) / 200, 0.18 + sl.mould * 0.5);
     });
   }
 
@@ -466,7 +548,8 @@ class Jar extends Phaser.Scene {
         c.add([img, bubble]);
         const big = e.kind === "fern" ? 120 : 50;
         // pointerdown, so the tap that places a creature doesn't also open its tooltip on release
-        c.setSize(big, big).setInteractive({ useHandCursor: true }).on("pointerdown", () => this.showTip(e, c.x, c.y));
+        // while a shop item is picked, a tap that lands on a creature still places it
+        c.setSize(big, big).setInteractive({ useHandCursor: true }).on("pointerdown", p => (this.selected ? this.tapJar(p, []) : this.showTip(e, c.x, c.y)));
         c.input.hitArea.y = look.oy === 1 || e.kind === "fern" ? -big / 2 : 0;
         (e.kind === "firefly" ? this.glows : this.ents).add(c);
         c.setScale(0); this.tweens.add({ targets: c, scale: 1, duration: 320, ease: "Back.Out" });
@@ -489,7 +572,7 @@ class Jar extends Phaser.Scene {
       if (sad && e.kind !== "snail") { sy *= 0.9; rot += 0.06; }
       const dir = e.kind === "snail" || e.kind === "springtail" ? e.dir : e.kind === "firefly" ? (e.tx > e.x ? 1 : -1) : 1;
       v.img.setScale(sx * dir, sy).setRotation(rot);
-      if (v.glow) { v.glow.x = -12 * dir; v.glow.setAlpha(e.glow ? 0.75 + 0.25 * Math.sin(time / 280 + e.id * 2) : 0); }
+      if (v.glow) { v.glow.x = -12 * dir; v.glow.setAlpha(e.glow ? (sad ? 0.3 : 1) * (0.75 + 0.25 * Math.sin(time / 280 + e.id * 2)) : 0); }
 
       const icon = e.why ? WHY_ICON[e.why] || "drop" : "";
       if (icon !== v.why) {
@@ -502,7 +585,10 @@ class Jar extends Phaser.Scene {
         }
       }
       if (icon) v.bubble.setY((e.kind === "fern" ? -125 : e.kind === "firefly" ? -34 : -66) + Math.sin(time / 400) * 3);
-      if (this.tipFor === e.id && this.tip.visible) this.showTip(e, v.c.x, v.c.y);
+      if (this.tipFor === e.id && this.tip.visible) {
+        if (this.time.now > this.tipUntil) this.tip.setVisible(false);
+        else this.showTip(e, v.c.x, v.c.y);
+      }
     }
     for (const [id, v] of this.views) {
       if (alive.has(id)) continue;
@@ -516,24 +602,32 @@ class Jar extends Phaser.Scene {
   drawPanel() {
     const s = this.s;
     this.dayText.setText(`Day ${Math.floor(s.day) + 1} · ${clock(s.day)}`);
-    this.seedText.setText(String(s.seeds));
+    if (s.lastPay && s.lastPay.day !== this.lastPayShown) { this.lastPayShown = s.lastPay.day; this.payPops(s.lastPay); }
+    this.seedText.setText(String(Math.max(0, s.seeds - this.pendingSeeds)));
     const vals = { hum: s.hum, air: s.air, light: Sim.light(s) * 100, mould: (Sim.mouldTotal(s) / Sim.N) * 100 };
+    const dry = { moss: 30, snail: 45, firefly: 50, fern: 50, springtail: 55, mushroom: 55 };
+    const humLo = Math.max(Sim.mossTotal(s) > 0.05 ? 30 : 0, ...s.ents.map(e => dry[e.kind]));
+    const sadWhy = new Set(s.ents.filter(e => e.mood === "sad").map(e => e.why));
+    const zoom = Req.current(s)?.id === "soggy" ? 20 : 100; // Fen's note: the Mould bar reads 0-20%, with a 1% tick
     const b = this.bars.clear();
     this.barDefs.forEach((d, i) => {
-      const y = 104 + i * 38, x0 = 916, bw = 250, v = vals[d.key];
+      const y = barY(i), x0 = 916, bw = 250, v = vals[d.key];
+      const good = d.key === "hum" ? [humLo, 85] : d.good, max = d.key === "mould" ? zoom : 100;
       b.fillStyle(0xf1e6d6).fillRoundedRect(x0, y - 10, bw, 20, 10);
-      if (d.good) b.fillStyle(0xdcefd2).fillRect(x0 + bw * d.good[0] / 100, y - 10, bw * (d.good[1] - d.good[0]) / 100, 20);
-      b.fillStyle(d.col).fillRoundedRect(x0, y - 10, Math.max(10, bw * v / 100), 20, 10);
+      if (good) b.fillStyle(0xdcefd2).fillRect(x0 + bw * good[0] / max, y - 10, bw * (Math.min(max, good[1]) - good[0]) / max, 20);
+      b.fillStyle(d.col).fillRoundedRect(x0, y - 10, Math.max(10, Math.min(bw, bw * v / max)), 20, 10);
+      if (max !== 100) b.lineStyle(3, 0xc8553d).lineBetween(x0 + bw / max, y - 13, x0 + bw / max, y + 13);
       b.lineStyle(2, COL.inkHex).strokeRoundedRect(x0, y - 10, bw, 20, 10);
-      const bad = d.good && (v < d.good[0] || v > d.good[1]);
-      this.barVals[i].setText(Math.round(v) + "%").setColor(bad ? "#c8553d" : COL.ink);
+      const bad = (good && (v < good[0] || v > good[1])) || d.why?.some(w => sadWhy.has(w));
+      const txt = d.key === "mould" && v > 0 && v < 10 ? (Math.ceil(v * 10) / 10).toFixed(1) : Math.round(v);
+      this.barVals[i].setText(txt + "%").setColor(bad ? "#c8553d" : COL.ink);
     });
 
     const g = this.graph.clear(), gx = 792, gy = 292, gw = 440, gh = 110;
     g.fillStyle(0xfffdf8).lineStyle(2, COL.inkHex, 0.5).fillRoundedRect(gx, gy, gw, gh, 10).strokeRoundedRect(gx, gy, gw, gh, 10);
     const hst = s.history;
     for (const [key, col] of [["hum", COL.hum], ["air", 0x5fb38a], ["moss", COL.mossBar], ["mould", 0xa79d90]]) {
-      if (hst.length < 2) break;
+      if (hst.length < 5) break;
       g.lineStyle(3, col).beginPath();
       hst.forEach((h, i) => {
         const px = gx + 8 + (i / 149) * (gw - 16), py = gy + gh - 8 - (h[key] / 100) * (gh - 16);
@@ -542,6 +636,14 @@ class Jar extends Phaser.Scene {
       g.strokePath();
     }
     this.logText.setText(s.log.slice(0, 4).map(l => "· " + l.text).join("\n"));
+    ["hum", "air"].forEach((k, i) => {
+      const f = Object.entries(s.flux?.[k] || {}).filter(([, v]) => Math.abs(v) >= 1);
+      const up = f.filter(([, v]) => v > 0).sort((a, b) => b[1] - a[1]).slice(0, 2).map(([n]) => FLUX_NAME[n]);
+      const down = f.filter(([, v]) => v < 0).sort((a, b) => a[1] - b[1]).slice(0, 2).map(([n]) => FLUX_NAME[n]);
+      this.causeText[i].setText([up.length ? "▲ " + up.join(", ") : "", down.length ? "▼ " + down.join(", ") : ""].filter(Boolean).join("   "));
+    });
+    const pay = Req.paying(s);
+    this.payText.setText(`+${pay.length} at midnight`);
     const q = this.thanks[0]; // a finished note waiting for its thank-you stays on the card, full
     const pr = q ? { note: q, goal: q.goal(s), p: 1, paused: false } : Req.progress(s);
     if (pr) this.card.refresh(pr, Req.NOTES.indexOf(pr.note), Req.NOTES.length);
