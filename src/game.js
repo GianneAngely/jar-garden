@@ -16,8 +16,9 @@ const WHY_ICON = {
 };
 
 const sunAt = day => { const f = day % 1; return f > 0.25 && f < 0.75 ? Math.sin(Math.PI * (f - 0.25) / 0.5) : 0; };
+// in 15-minute steps: at 4x a minute is shorter than a frame, and re-rendering the text every frame is costly
 const clock = day => {
-  const m = Math.floor((day % 1) * 24 * 60), h = Math.floor(m / 60);
+  const m = Math.floor((day % 1) * 24 * 4) * 15, h = Math.floor(m / 60);
   return `${(h + 11) % 12 + 1}:${String(m % 60).padStart(2, "0")} ${h < 12 ? "AM" : "PM"}`;
 };
 const SEED_AT = { x: 1060, y: 56 }; // the seed counter, where flying seeds land
@@ -142,6 +143,10 @@ class Jar extends Phaser.Scene {
       const r = 2 + hash(k, 3) * 3.5;
       this.dew.fillStyle(0xffffff, 0.55).fillCircle(x, y, r).fillStyle(0xbfdbe6, 0.6).fillCircle(x + r * 0.25, y + r * 0.3, r * 0.6);
     }
+    this.jarBack = this.bake(this.jarBack, "jar-back");
+    this.jarFront = this.bake(this.jarFront, "jar-front");
+    this.haze = this.bake(this.haze, "jar-haze");
+    this.dew = this.bake(this.dew, "jar-dew");
     this.lid = this.add.image(JAR.x + JAR.w / 2, JAR.y + 22, "cork").setOrigin(0.5, 1).setDisplaySize(JAR.w - 112, 46);
     this.lidHome = { x: this.lid.x, y: this.lid.y };
 
@@ -172,6 +177,17 @@ class Jar extends Phaser.Scene {
     this.input.keyboard?.on("keydown-SPACE", () => this.speedBtn.visible && !this.modal && this.togglePause());
     this.input.keyboard?.on("keydown-ESC", () => this.select(null));
     window.STATE = "jar";
+  }
+
+  // Turn a static Graphics into a texture once, in the same place in the display list: WebGL rebuilds every
+  // Graphics' geometry each frame, and these never change (playtest perf: 4x-throttled CPU dropped to 30 fps).
+  bake(g, key) {
+    if (this.textures.exists(key)) this.textures.remove(key);
+    g.generateTexture(key, W, H);
+    const img = this.make.image({ x: 0, y: 0, key, add: false }).setOrigin(0).setAlpha(g.alpha).setDepth(g.depth);
+    this.children.addAt(img, this.children.getIndex(g));
+    g.destroy();
+    return img;
   }
 
   // Jar glass: drawn in code (Flow kept copying its reference into glass), styled like the art
@@ -219,6 +235,7 @@ class Jar extends Phaser.Scene {
     const g = this.add.graphics();
     g.fillStyle(COL.inkHex, 0.18).fillRoundedRect(770, 26, 490, 676, 22);
     g.fillStyle(COL.card).lineStyle(4, COL.inkHex).fillRoundedRect(766, 20, 490, 676, 22).strokeRoundedRect(766, 20, 490, 676, 22);
+    this.bake(g, "panel-bg");
     this.barGlow = this.add.graphics(); // the coach's highlight, under the bars
     this.dayText = label(this, 792, 56, "", 28);
     this.add.image(SEED_AT.x, SEED_AT.y, "icon-seed").setScale(30 / 96);
@@ -248,7 +265,8 @@ class Jar extends Phaser.Scene {
     // the next payday, live: which kinds are happy enough to pay a seed at midnight
     this.payText = label(this, SEED_AT.x - 2, 84, "", 14, "#7a5a48", 0);
 
-    this.graph = this.add.graphics();
+    this.graph = this.make.graphics({ add: false }); // drawn into graphRT only when the history changes
+    this.graphRT = this.add.renderTexture(792, 292, 440, 110).setOrigin(0);
     this.graphLabel = label(this, 792, 272, "last 15 days", 16, "#9a7a66");
     [["humidity", COL.hum], ["air", 0x5fb38a], ["moss", COL.mossBar], ["mould", 0xa79d90]].forEach(([n, c], i) => {
       this.add.rectangle(912 + i * 84, 272, 14, 6, c).setOrigin(0, 0.5);
@@ -277,6 +295,9 @@ class Jar extends Phaser.Scene {
       });
       c.paint = () => {
         const open = Req.canBuy(this.s, kind), on = this.selected === kind, afford = this.s.seeds >= Sim.KINDS[kind].cost;
+        const look = `${open}${on}${afford}`;
+        if (look === c.look) return;
+        c.look = look;
         bg.clear().fillStyle(on ? 0xffe6a8 : open ? 0xfffdf8 : 0xf1e6d6).lineStyle(on ? 4 : 2, COL.inkHex, afford && open ? 1 : 0.35).fillRoundedRect(-73, -37, 146, 74, 14).strokeRoundedRect(-73, -37, 146, 74, 14);
         icon.setTint(open ? 0xffffff : 0x9a8a80);
         cost.setVisible(open); lock.setVisible(!open);
@@ -528,6 +549,7 @@ class Jar extends Phaser.Scene {
     this.select(null);
     this.pendingSeeds = 0;
     this.lastPayShown = s.lastPay?.day;
+    this.graphStamp = null;
     this.syncButtons();
     this.card.noteId = null;
     this.coach.reset();
@@ -789,19 +811,8 @@ class Jar extends Phaser.Scene {
       this.barVals[i].setText(txt + "%").setColor(bad ? "#c8553d" : COL.ink);
     });
 
-    const g = this.graph.clear(), gx = 792, gy = 292, gw = 440, gh = 110;
-    this.graphLabel.setText(s.history.length >= 150 ? "last 15 days" : "so far");
-    g.fillStyle(0xfffdf8).lineStyle(2, COL.inkHex, 0.5).fillRoundedRect(gx, gy, gw, gh, 10).strokeRoundedRect(gx, gy, gw, gh, 10);
-    const hst = s.history;
-    for (const [key, col] of [["hum", COL.hum], ["air", 0x5fb38a], ["moss", COL.mossBar], ["mould", 0xa79d90]]) {
-      if (hst.length < 3) break;
-      g.lineStyle(3, col).beginPath();
-      hst.forEach((h, i) => {
-        const px = gx + 8 + (i / Math.max(hst.length - 1, 29)) * (gw - 16), py = gy + gh - 8 - (h[key] / 100) * (gh - 16);
-        i ? g.lineTo(px, py) : g.moveTo(px, py);
-      });
-      g.strokePath();
-    }
+    const hst = s.history, stamp = hst.length + ":" + (hst.at(-1)?.hum ?? "");
+    if (stamp !== this.graphStamp) this.drawGraph(hst, stamp);
     this.logText.setText(s.log.slice(0, 4).map(l => "· " + l.text).join("\n"));
     ["hum", "air"].forEach((k, i) => {
       const all = Object.entries(s.flux?.[k] || {}).filter(([n]) => n !== "lid" || s.lid);
@@ -817,5 +828,23 @@ class Jar extends Phaser.Scene {
     const pr = q ? { note: q, goal: q.goal(s), p: 1, paused: false } : Req.progress(s);
     if (pr) this.card.refresh(pr, Req.NOTES.indexOf(pr.note), Req.NOTES.length);
     for (const c of this.cards) c.paint();
+  }
+
+  // the 15-day graph, redrawn into its texture only when a new sample arrives
+  drawGraph(hst, stamp) {
+    this.graphStamp = stamp;
+    const g = this.graph.clear(), gx = 792, gy = 292, gw = 440, gh = 110;
+    this.graphLabel.setText(hst.length >= 150 ? "last 15 days" : "so far");
+    g.fillStyle(0xfffdf8).lineStyle(2, COL.inkHex, 0.5).fillRoundedRect(gx + 1, gy + 1, gw - 2, gh - 2, 10).strokeRoundedRect(gx + 1, gy + 1, gw - 2, gh - 2, 10);
+    for (const [key, col] of [["hum", COL.hum], ["air", 0x5fb38a], ["moss", COL.mossBar], ["mould", 0xa79d90]]) {
+      if (hst.length < 3) break;
+      g.lineStyle(3, col).beginPath();
+      hst.forEach((h, i) => {
+        const px = gx + 8 + (i / Math.max(hst.length - 1, 29)) * (gw - 16), py = gy + gh - 8 - (h[key] / 100) * (gh - 16);
+        i ? g.lineTo(px, py) : g.moveTo(px, py);
+      });
+      g.strokePath();
+    }
+    this.graphRT.clear().draw(g, -gx, -gy);
   }
 }
