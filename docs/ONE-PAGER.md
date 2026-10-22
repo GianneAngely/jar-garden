@@ -5,12 +5,13 @@ Built from a 3-proposal design panel plus 2 judges. Every number was checked aga
 ## Core loop
 Read a bubble, use a verb (lid, lamp, mist, buy), then watch a bar and a creature change. One jar all game, one neighbour note at a time. Each midnight pays 1 seed per happy species, and seeds buy new life.
 
-## First 5 minutes (at 2x)
-- 0:27 the first firefly glows.
-- 0:38 first midnight seeds.
-- ~1:45 moss carpet.
-- ~2:40 three fireflies.
-- ~3:40 mould cleaned.
+## First 5 minutes (time runs 2x after the onboarding)
+- ~0:20 the first firefly glows (1x, guided), then Hazel's postcard.
+- ~1:00 Mo's moss carpet (35%).
+- ~1:30 Olive's light show (she brings a firefly).
+- ~2:10 Fen's mould cleaned.
+- ~2:50 a jar that looks after itself; ~3:30 the firefly party, then free play.
+(Engaged players; reading and shopping add 20-60 s per note. Measured in tools/reqtest.mjs: arc median 3.9 in-game days.)
 
 ## Neighbour requests
 | # | Who | Ask | Done when | Reward | Teaches |

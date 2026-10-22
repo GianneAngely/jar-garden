@@ -17,7 +17,8 @@ Status: DRAFT. Nothing is uploaded or published. Angel submits herself (or appro
 - **Tags:** simulation, cozy, ecosystem, terrarium, relaxing, cute, nature, sandbox, management, pastel
 - **AI generation disclosure (itch field):** Yes. Graphics, Code, Text (see the section below).
 - **Cover image:** `docs/m5/cover-*.png` (630 × 500, version A/B/C sent for Angel to pick)
-- **Screenshots:** `docs/m5/shots/` (5, in the order listed there)
+- **Screenshots:** `docs/m5/shots/` 1-first-glow, 2-moss-carpet, 3-light-show, 4-mould, 5-party (1280 × 720)
+- **Trailer:** `docs/m5/trailer.mp4` (29 s, 1280 × 720). Optional on the page via a YouTube link.
 
 ## One-line statement (jam requirement: what it simulates, who it is for)
 Jar Garden simulates a sealed terrarium ecosystem (humidity, fresh air, light and day/night, moss growth, mould, a small food web) for players who enjoy gentle, readable systems and cozy games.
@@ -61,7 +62,7 @@ Finish all six for the party and a collage of your postcards, then keep playing 
 - **Inspect:** tap a creature to read its mood. The bubbles above creatures show what they need. The panel shows the bars with their causes (▲ / ▼), the last 15 days, and the next payday.
 - **Mute:** the speaker icon (top right).
 
-A day lasts 60 seconds at 1x. A full playthrough takes about 5–10 minutes.
+A day lasts 60 seconds at 1x; after the first note time runs at 2x. A full playthrough takes about 5–8 minutes.
 
 **Credits**
 - Made by Gianne Angely (Angel's Desk) for Game Gauntlet: SIM Jam, Oct 19 – Nov 4, 2026.
