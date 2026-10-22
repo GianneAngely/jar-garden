@@ -110,8 +110,8 @@ await click(685, 664);
 check(await evaluate(`game.scene.getScene("Jar").speedIdx === 1`), "speed button");
 
 // lose: no animals for a day -> "The jar went quiet" -> Rewind restores the note's start
-await evaluate(`(() => { const sc = game.scene.getScene("Jar"); jar.ents = jar.ents.filter(e => !Sim.ANIMALS.includes(e.kind));
-  for (let k = 0; k < 260; k++) { Sim.tick(jar, 1/240); const ev = Req.update(jar, 1/240); if (ev) sc.onNote(ev); } })()`);
+await evaluate(`(() => { const sc = game.scene.getScene("Jar"); jar.ents = jar.ents.filter(e => !Sim.ANIMALS.includes(e.kind)); jar.slots.forEach(sl => sl.moss = 0); // no note can finish (and bring a gift) meanwhile
+  const evs = []; for (let k = 0; k < 260; k++) { Sim.tick(jar, 1/240); const ev = Req.update(jar, 1/240); if (ev) { evs.push(ev.type); sc.onNote(ev); } } return evs.join(",") + " i=" + jar.req.i + " ents=" + jar.ents.map(e => e.kind).join("/"); })()`).then(r => V && console.log("     lose events:", r));
 await sleep(500);
 check(await evaluate(`game.scene.getScene("Jar").children.list.some(o => o.depth === 70)`), "lose shows the quiet-jar card");
 await shot("6-lose.png");

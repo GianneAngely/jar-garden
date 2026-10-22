@@ -376,7 +376,6 @@ class Jar extends Phaser.Scene {
         if (v) at.push([v.c.x, v.c.y - (k === "firefly" ? 10 : 30)]);
       }
     }
-    this.pendingSeeds += pay.kinds.length - at.length; // kinds with no view (just died) still paid
     this.bumpSeeds(0);
     at.forEach(([x, y], i) => {
       this.pendingSeeds++;

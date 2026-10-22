@@ -17,7 +17,7 @@ Read a bubble, use a verb (lid, lamp, mist, buy), then watch a bar and a creatur
 |---|---|---|---|---|---|
 | 1 | Hazel (hedgehog) | "Make my jar glow?" | Dot glows, not sad, lamp off, held 0.05 d | +4, speed button | all four verbs |
 | 2 | Mo (mole) | "Moss on 40% of the floor!" | moss cover >= 40% | +4, unlocks Springtail | light + damp grows moss; the lamp makes Dot sulk |
-| 3 | Olive (owl) | "3 fireflies glowing for 6 hours!" | >= 3 glowing, none sad, held 0.25 d (pauses by day) | +6, unlocks Mushroom | darkness, damp, saving seeds |
+| 3 | Olive (owl) | "3 fireflies glowing for 4 hours!" (she brings one firefly) | >= 3 glowing, none sad, held 0.17 d (pauses by day) | +3, unlocks Mushroom | darkness, damp |
 | 4 | Fen (frog) | "Soggy leaves! Mould under 1%?" | after a staged leaf dump: mould < 1%, held 0.5 d | +4, unlocks Fern | fresh air or mushrooms beat mould |
 | 5 | Hazel | "Every kind, nobody sad, lid shut a day!" | 6 kinds, none sad, lid shut, mould < 5%, held 1 d | +4 | a shut jar makes its own air |
 | 6 | Everyone | "Party! 5 fireflies, every kind here." | >= 5 glowing, every kind present, nobody sad, held 0.25 d (pauses by day) | WIN | everything |
@@ -45,7 +45,7 @@ Every tap moves a bar and flips a mood bubble. Dusk falls on its own, and lamp-o
 
 ## Seed economy
 - **Payday:** +1 per happy species, max 6 a day (was ~12). A sulking creature shows "no seed".
-- **Seeds:** start with 8. Note rewards 4 / 4 / 6 / 4 / 4.
+- **Seeds:** start with 8. Note rewards 4 / 4 / 3 / 4 / 4, and Olive brings a free firefly with note 3.
 - **Income:** paydays give about 2.4 a day passive and 3 engaged; with note rewards about 7 a day (was 4.9 / 9.3 from paydays alone).
 - **Choices:**
   - Lamp for fast moss vs a happy Dot.

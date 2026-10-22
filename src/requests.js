@@ -21,6 +21,8 @@
   }
   const kindIcons = st => SPECIES.map(k => ({ key: k, on: st[k].n > 0, sad: st[k].sad > 0 }));
   const why = s => { const e = sadOne(s); return e ? `${nameOf(e)}: ${e.why}` : ""; };
+  const spawnGift = (s, kind) => { if (Sim.count(s, kind) < Sim.CAP[kind]) { s.seeds += Sim.KINDS[kind].cost; Sim.place(s, kind, 0.25 + (s.nextId % 5) * 0.12, 0.6); note(s, `Olive brought a ${kind}!`); } };
+  const note = (s, text) => { s.log.unshift({ day: Math.floor(s.day) + 1, text }); if (s.log.length > 8) s.log.pop(); };
   // the note needs more fireflies than the seeds can buy right now: say where seeds come from
   const short = (s, have, need) => (have < need && s.seeds < Sim.KINDS.firefly.cost ? "More seeds at midnight. Try 4x!" : "");
 
@@ -49,8 +51,11 @@
       },
     },
     {
-      id: "show", who: "owl", name: "Olive", ask: "3 fireflies glowing for 6 hours!", line: "A little night show for my owlets?", thanks: "The owlets loved the light show. Hoo!",
-      reward: 6, unlock: "mushroom", hold: 0.25, night: true,
+      id: "show", who: "owl", name: "Olive", ask: "3 fireflies glowing for 4 hours!", line: "I brought you a firefly! One more?", thanks: "The owlets loved the light show. Hoo!",
+      reward: 3, unlock: "mushroom", hold: 0.17, night: true,
+      // Olive brings a firefly (her art holds a firefly jar): one purchase instead of two, so the note never sits
+      // two midnights waiting for seeds
+      setup(s) { spawnGift(s, "firefly"); },
       goal(s) {
         const n = glowing(s), have = Sim.count(s, "firefly");
         return { ok: n >= 3, text: night(s) ? `${Math.min(n, 3)}/3 glowing` : `${Math.min(have, 3)}/3 fireflies`, pips: { n: night(s) ? n : have, of: 3 }, why: why(s), hint: short(s, have, 3) };

@@ -130,3 +130,9 @@ Tes: request 37/37 (ada 5 cek baru), sim 9/9, UI 28/28.
 - Kunang-kunang suka numpuk di satu titik. Bayi siput lahir langsung ukuran penuh. Mould masih kayak oval abu-abu.
 - Setelah menang, biji numpuk dan ga ada yang bisa dibeli (sink buat free play).
 - HP posisi portrait jadi strip kecil. Butuh kartu "putar HP" sama embed itch landscape (M5).
+
+**Tambahan setelah reproduksi playtest (22 Okt):**
+- Catatan Olive masih nunggu 2 kali tengah malam tanpa bisa ngapa-ngapain (sekitar 60 detik di 2x), soalnya biji gede-gedean (kunang-kunang harganya 6) dan hold 6 jam sering lewat subuh.
+  - Sekarang Olive bawa 1 kunang-kunang hadiah pas dateng (cocok sama art-nya yang megang toples kunang-kunang), hold-nya jadi 4 jam, dan hadiahnya jadi +3 biar ekonomi tetap ketat.
+  - Hasilnya: catatan Olive median 0,49 hari (sebelumnya 0,85), arc 4,7 hari (sebelumnya 5,5), sisa biji pas menang median 7, dan semua baseline "harus gagal" tetap 0/20.
+- Bug penghitung biji: angkanya bisa nyangkut lebih rendah dari biji asli kalau makhluk yang dibayar ga punya view. Udah dibenerin.
