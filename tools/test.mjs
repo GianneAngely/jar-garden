@@ -7,9 +7,11 @@ import { pathToFileURL } from "node:url";
 import { launch, serve, sleep } from "./cdp.mjs";
 
 // --http: serve the folder over http (WebGL + jar snapshots, like itch); default file:// (Canvas)
+// --audio (with --http): also run every sound through a muted sound manager (?mute&audiotest), never audible
+const AUDIOTEST = process.argv.includes("--audio");
 const root = resolve(import.meta.dirname, "..");
 const server = process.argv.includes("--http") ? await serve(root) : null;
-const url = process.argv.filter(a => !a.startsWith("-"))[2] || (server ? server.url + "index.html" : pathToFileURL(join(root, "index.html")).href) + "?mute&seed=7";
+const url = process.argv.filter(a => !a.startsWith("-"))[2] || (server ? server.url + "index.html" : pathToFileURL(join(root, "index.html")).href) + "?mute&seed=7" + (AUDIOTEST ? "&audiotest" : "");
 const outDir = process.argv.filter(a => !a.startsWith("-"))[3] || join(root, "dist", "shots");
 mkdirSync(outDir, { recursive: true });
 
@@ -29,7 +31,8 @@ await sleep(400);
 await shot("0-title.png");
 await click(381, 362);                 // Play
 check(await waitFor(`window.STATE === "jar"`), "Play opens the jar");
-check(await evaluate(`!game.sound.context`), "silent (?mute)");
+if (AUDIOTEST) check(await evaluate(`game.sound.mute === true && game.sound.volume === 0 && !!game.sound.context`), "audio test: sound runs but is muted at volume 0");
+else check(await evaluate(`!game.sound.context`), "silent (?mute)");
 await sleep(500);
 await shot("1-start.png");
 
@@ -117,6 +120,17 @@ check(await evaluate(`game.scene.getScene("Jar").children.list.some(o => o.depth
 await shot("6-lose.png");
 await click(640, 415);
 check(await evaluate(`(() => { const sc = game.scene.getScene("Jar"); return jar !== sc.noteSnap && jar.ents.some(e => Sim.ANIMALS.includes(e.kind)) && jar.req.i === sc.noteSnap.req.i && !jar.req.lost; })()`), "Rewind brings the jar back to the note start" + (V ? " " + await evaluate(`(() => { const sc = game.scene.getScene("Jar"); return [jar === sc.noteSnap, jar.ents.length, jar.req.i, sc.noteSnap.req.i, jar.req.lost, sc.children.list.filter(o => o.depth === 70).length].join(","); })()`) : ""));
+
+if (AUDIOTEST) check(await evaluate(`["music-day", "music-night"].includes(Audio.beds.music?.key) && Audio.beds.music.snd.isPlaying && game.sound.mute`), "audio test: music bed follows day/night, muted");
+// audio files decode (OfflineAudioContext renders nothing out loud; the page itself stays ?mute)
+if (server) {
+  const res = await evaluate(`(async () => { const ctx = new OfflineAudioContext(1, 44100, 44100), out = [];
+    for (const k of [...SFX, ...LOOPS]) for (const ext of ["ogg", "mp3"]) {
+      try { const a = await ctx.decodeAudioData(await (await fetch("assets/audio/" + k + "." + ext)).arrayBuffer()); if (!(a.duration > 0.05)) out.push(k + "." + ext + " empty"); }
+      catch (e) { out.push(k + "." + ext + " " + e.message); } }
+    return out; })()`);
+  check(Array.isArray(res) && res.length === 0, "all audio files decode (ogg + mp3)" + (res?.length ? ": " + res.join(", ") : ""));
+}
 
 check(errors.length === 0, "no console errors" + (errors.length ? ": " + errors.join(" | ") : ""));
 console.log(fail ? `${fail} FAILED` : "ALL OK", "shots in", outDir);

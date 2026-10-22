@@ -42,7 +42,7 @@ function button(scene, x, y, w, h, str, icon, onTap) {
   c.setSize(w, h).setInteractive({ useHandCursor: true })
     .on("pointerdown", () => c.setScale(0.95))
     .on("pointerout", () => c.setScale(1))
-    .on("pointerup", () => { c.setScale(1); Audio.blip(scene, 700); onTap(); });
+    .on("pointerup", () => { c.setScale(1); Audio.sfx(scene, "click", { volume: 0.35 }); onTap(); });
   c.setLabel = s => t.setText(s);
   c.setOn = paint;
   return c;
@@ -51,8 +51,13 @@ function button(scene, x, y, w, h, str, icon, onTap) {
 class Boot extends Phaser.Scene {
   constructor() { super("Boot"); }
   preload() {
+    // a small progress bar, so a slow connection never shows an empty screen while art and audio load
+    const g = this.add.graphics(), t = this.add.text(W / 2, H / 2 - 40, "Growing the jar...", { fontFamily: FONT, fontSize: "26px", color: COL.ink }).setOrigin(0.5);
+    this.load.on("progress", p => g.clear().fillStyle(0xe6d5bf).fillRoundedRect(W / 2 - 160, H / 2, 320, 18, 9).fillStyle(0x9fd08a).fillRoundedRect(W / 2 - 160, H / 2, Math.max(18, 320 * p), 18, 9).lineStyle(3, COL.inkHex).strokeRoundedRect(W / 2 - 160, H / 2, 320, 18, 9));
+    this.load.once("complete", () => { g.destroy(); t.destroy(); });
     for (const k of SPRITES) this.load.image(k, `assets/${k}.webp`);
     for (const k of ICONS) this.load.image("icon-" + k, `assets/icon-${k}.webp`);
+    Audio.load(this);
     this.load.image("bg-day", "assets/bg-day.jpg");
     this.load.image("bg-night", "assets/bg-night.jpg");
     this.load.image("title", "assets/title.jpg");
@@ -176,7 +181,10 @@ class Jar extends Phaser.Scene {
     const live = (key, fn) => () => (this.coach.allows(key) ? fn() : this.coach.nudge());
     this.lidBtn = button(this, cx - 195, y, 122, 40, "Open lid", "lid", live("lid", () => this.toggleLid()));
     this.lampBtn = button(this, cx - 65, y, 122, 40, "Lamp off", "bulb", live("lamp", () => this.toggleLamp()));
-    this.mistBtn = button(this, cx + 65, y, 122, 40, "Mist", "spray", live("mist", () => { Sim.mist(this.s); this.puff(); FX.fog(this); this.say("Pssst! +10 humidity"); }));
+    this.mistBtn = button(this, cx + 65, y, 122, 40, "Mist", "spray", live("mist", () => {
+      Sim.mist(this.s); this.puff(); FX.fog(this); this.say("Pssst! +10 humidity");
+      Audio.sfx(this, "mist", { volume: 0.45 }); Audio.sfx(this, "drip", { volume: 0.25, delay: 0.45, rate: 1.1 });
+    }));
     this.speedBtn = button(this, cx + 195, y, 122, 40, "▶ 1x", null, live("speed", () => this.cycleSpeed()));
     for (const b of [this.lidBtn, this.lampBtn, this.mistBtn, this.speedBtn]) b.setDepth(35); // above the party portraits
   }
@@ -275,6 +283,7 @@ class Jar extends Phaser.Scene {
 
   toggleLid() {
     Sim.setLid(this.s, !this.s.lid);
+    Audio.sfx(this, this.s.lid ? "lid-open" : "lid-close", { volume: 0.5 });
     this.lidBtn.setLabel(this.s.lid ? "Close lid" : "Open lid");
     this.lidBtn.setOn(this.s.lid);
     const { x, y } = this.lidHome;
@@ -283,6 +292,7 @@ class Jar extends Phaser.Scene {
 
   toggleLamp() {
     Sim.setLamp(this.s, !this.s.lamp);
+    Audio.sfx(this, this.s.lamp ? "lamp-on" : "lamp-off", { volume: 0.5 });
     this.syncButtons();
   }
 
@@ -301,7 +311,7 @@ class Jar extends Phaser.Scene {
     const y = Phaser.Math.Clamp((JAR.soil - 6 - p.y) / AIR_H, 0.25, 0.85);
     const r = Req.place(this.s, this.selected, x, y);
     if (r.ok) {
-      Audio.blip(this, 520);
+      Audio.sfx(this, "plop", { rate: { moss: 1.25, springtail: 1.15, fern: 0.85, mushroom: 0.95 }[this.selected] || 1 });
       if (this.selected === "firefly") FX.sparkle(this, p.x, p.y, 6);
       else FX.dust(this, this.selected === "moss" ? jx(Sim.slotX(Sim.slotOf(x))) : jx(x), JAR.soil);
       if (this.selected === "moss") this.prevMoss[Sim.slotOf(x)] = 1; // placed, not spread: no spread sparkle
@@ -338,16 +348,18 @@ class Jar extends Phaser.Scene {
   thank(wait) {
     const note = this.thanks[0];
     this.time.delayedCall(wait, () => this.snapJar("pc-" + note.id, photo => {
-      Audio.blip(this, 880, 0.15);
+      Audio.sfx(this, "note-done", { volume: 0.55 });
       const lead = note.id === "glow" ? this.firstGlow() : 0;
       this.time.delayedCall(lead, () => this.card.celebrate(note, () => {
         if (note.unlock === "speed") {
           this.speedBtn.setVisible(true).setScale(0);
           this.tweens.add({ targets: this.speedBtn, scale: 1, duration: 400, ease: "Back.Out" });
           this.say("Speed unlocked! Try 2x.");
+          Audio.sfx(this, "unlock", { volume: 0.45 });
         } else if (note.unlock) {
           this.tweens.add({ targets: this.cards[SHOP.indexOf(note.unlock)], scale: 1.12, yoyo: true, repeat: 1, duration: 220 });
           this.say(`New in the shop: ${Sim.KINDS[note.unlock].name}!`);
+          Audio.sfx(this, "unlock", { volume: 0.45 });
         }
         this.thanks.shift();
         if (this.thanks.length) this.thank(1800);
@@ -361,6 +373,7 @@ class Jar extends Phaser.Scene {
   firstGlow() {
     const dot = this.s.ents.find(e => e.name === "Dot"), v = dot && this.views.get(dot.id);
     const cam = this.cameras.main;
+    Audio.sfx(this, "glow", { volume: 0.55 });
     this.tweens.add({ targets: this, dim: 0.22, duration: 500, yoyo: true, hold: 1200 });
     cam.pan(580, 380, 700, "Sine.easeInOut"); // 580: at 1.12x the view stays inside the 1280-wide room
     cam.zoomTo(1.12, 700, "Sine.easeInOut");
@@ -435,6 +448,8 @@ class Jar extends Phaser.Scene {
 
   // one seed landed on the counter (n = 1), or just re-show it; the counter lags the sim by the seeds still flying
   bumpSeeds(n = 1) {
+    if (n) { this.seedRun = this.time.now - (this.lastSeedAt || 0) < 600 ? (this.seedRun || 0) + 1 : 0; this.lastSeedAt = this.time.now; }
+    if (n) Audio.sfx(this, "seed", { volume: 0.3, rate: 1 + Math.min(8, this.seedRun) * 0.07 });
     this.pendingSeeds = Math.max(0, this.pendingSeeds - n);
     this.seedText.setText(String(Math.max(0, this.s.seeds - this.pendingSeeds)));
     if (!n) return;
@@ -501,6 +516,7 @@ class Jar extends Phaser.Scene {
   }
 
   showLose(tip) {
+    Audio.sfx(this, "lose", { volume: 0.5 });
     this.overlay("The jar went quiet", `No animals are left.\nTip: ${tip}`, "Rewind", () => {
       this.loadJar(structuredClone(this.noteSnap));
       this.speedIdx = 0;
@@ -511,6 +527,7 @@ class Jar extends Phaser.Scene {
 
   // The end: every postcard from the six notes in a row (photos of your jar over the whole story), a few numbers
   showWin() {
+    Audio.sfx(this, "win", { volume: 0.55 });
     const s = this.s, o = this.openModal();
     const dim = this.add.rectangle(0, 0, W, H, 0x2b2036, 0.5).setOrigin(0).setInteractive();
     const g = this.add.graphics().fillStyle(COL.card).lineStyle(4, COL.inkHex).fillRoundedRect(130, 70, 1020, 580, 26).strokeRoundedRect(130, 70, 1020, 580, 26);
@@ -556,6 +573,13 @@ class Jar extends Phaser.Scene {
       if (s.slots[i].mould > 0.2 && Math.random() < s.slots[i].mould + 0.3) FX.spore(this, jx(Sim.slotX(i)));
     }
     this.lampGlow.setAlpha(s.lamp ? 0.6 : 0);
+
+    const nightNow = dusk > 0.5;
+    Audio.bed(this, "music", nightNow ? "music-night" : "music-day");
+    Audio.bed(this, "amb", nightNow ? "amb-night" : "amb-day");
+    const glowing = s.ents.some(e => e.glow && e.mood !== "sad");
+    if (glowing && !this.wasGlowing && Req.current(s)?.id !== "glow") Audio.sfx(this, "glow", { volume: 0.3 });
+    this.wasGlowing = glowing;
 
     this.coach.update(time);
     this.drawSoil(time);

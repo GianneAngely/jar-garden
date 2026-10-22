@@ -161,6 +161,7 @@ class NoteCard {
       sc.tweens.add({ targets: this.box, alpha: 0, scale: 0.9, duration: 260 });
       const pc = postcard(sc, note, day, photo).setPosition(140, 300).setDepth(31).setAngle(-14).setScale(0.6).setAlpha(0);
       sc.tweens.add({ targets: pc, angle: -4, scale: 1, alpha: 1, duration: 520, ease: "Back.Out" });
+      Audio.sfx(sc, "postcard", { volume: 0.5 });
       sc.time.delayedCall(3400, () => {
         sc.tweens.add({ targets: pc, x: -200, angle: -20, duration: 450, ease: "Back.In", onComplete: () => pc.destroy() });
         this.people.each(im => sc.tweens.add({ targets: im, y: 724 + im.displayHeight + 20, duration: 380, ease: "Back.In" }));

@@ -16,7 +16,10 @@ const jy = y => JAR.soil - 6 - y * AIR_H;
 const inJar = (px, py) => px > JAR.x + 10 && px < JAR.x + JAR.w - 10 && py > JAR.y + 20 && py < JAR.floor;
 
 const QS = new URLSearchParams(location.search);
-const NO_AUDIO = QS.has("mute");
+// ?mute: no audio at all. ?mute&audiotest (tests only): load and run every sound, but through a muted sound
+// manager in a --mute-audio browser, so the audio code is exercised and nothing is ever heard.
+const AUDIO_TEST = QS.has("audiotest");
+const NO_AUDIO = QS.has("mute") && !AUDIO_TEST;
 const store = {
   get(k) { try { return localStorage.getItem(k); } catch { return null; } },
   set(k, v) { try { localStorage.setItem(k, v); } catch {} },

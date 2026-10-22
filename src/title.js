@@ -28,6 +28,7 @@ class Title extends Phaser.Scene {
       .on("pointerup", () => mute.setText(Audio.toggle(this.game) ? "🔇" : "🔊"));
     this.input.keyboard?.once("keydown-ENTER", () => this.go());
     this.input.keyboard?.once("keydown-SPACE", () => this.go());
+    Audio.bed(this, "music", "music-title", 1200);
     window.STATE = "title";
   }
 
