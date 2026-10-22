@@ -1,8 +1,11 @@
 // Silent GIF recorder. Stops Phaser's own loop and steps the game frame by frame, so the GIF is smooth
 // and the same every run no matter how slow headless Chrome is. A drawn cursor shows every click.
-// usage: node tools/record.mjs <scenario.mjs> <out.gif> [--fps 20] [--width 800] [--query "seed=7"] [--http]
+// usage: node tools/record.mjs <scenario.mjs> <out.gif|out.mp4> [--fps 20] [--width 800] [--query "seed=7"] [--http]
 // --http serves the folder and renders with the GPU in WebGL, like itch (needed for postcard photos).
-// A scenario exports `default async function (rec)` using rec.wait(sec), rec.until(js), rec.click(gx, gy), rec.eval(js).
+// out.mp4: H.264 at full size plus <out>.events.json (rec.sound marks) for tools/mux.mjs, which builds the
+// soundtrack offline. The page itself always stays ?mute.
+// A scenario exports `default async function (rec)` using rec.wait(sec), rec.until(js), rec.click(gx, gy), rec.eval(js),
+// rec.sound(key, opts) (marks a sound at the current frame for the soundtrack) and rec.caption(text) (DOM caption).
 import { execFileSync } from "node:child_process";
 import { mkdtempSync, rmSync, writeFileSync, mkdirSync } from "node:fs";
 import { tmpdir } from "node:os";
@@ -23,6 +26,7 @@ const url = (server ? server.url + "index.html" : pathToFileURL(join(root, "inde
 const frames = mkdtempSync(join(tmpdir(), "jg-frames-"));
 const cdp = await launch({ gpu: !!server });
 let n = 0;
+const events = [];
 const D = 1000 / FPS;
 const snap = async () => writeFileSync(join(frames, `f${String(n++).padStart(5, "0")}.png`), await cdp.png());
 const step = async () => { await cdp.evaluate(`(() => { __t += ${D}; game.step(__t, ${D}); })()`); await snap(); };
@@ -32,6 +36,9 @@ const rec = {
   async wait(sec) { for (let i = 0; i < Math.round(sec * FPS); i++) await step(); },
   // step frames until a page condition holds (or maxSec passes)
   async until(js, maxSec = 30) { for (let i = 0; i < maxSec * FPS && !(await cdp.evaluate(js)); i++) await step(); },
+  sound(key, opts = {}) { events.push({ t: n / FPS, key, ...opts }); },
+  // a soft caption pill at the bottom of the frame ("" hides it)
+  caption(text) { return cdp.evaluate(`__caption(${JSON.stringify(text)})`); },
   // glide the drawn cursor to (gx, gy) in game coordinates, then press
   async click(gx, gy, glide = 0.4) {
     const from = (await cdp.evaluate(`[__cur.gx, __cur.gy]`)) || [gx, gy];
@@ -58,6 +65,10 @@ try {
     c.style.cssText = "position:fixed;z-index:9;width:26px;height:26px;margin:-13px 0 0 -13px;border-radius:50%;background:rgba(255,253,248,.85);border:3px solid #6b4a3a;pointer-events:none;transition:none;left:-50px;top:-50px";
     document.body.appendChild(c);
     window.__cur = { el: c, gx: 640, gy: 400 };
+    const cap = document.createElement("div");
+    cap.style.cssText = "position:fixed;z-index:9;left:50%;bottom:34px;transform:translateX(-50%);font:600 30px Fredoka,sans-serif;color:#6b4a3a;background:rgba(255,248,239,.92);border:3px solid #6b4a3a;border-radius:26px;padding:8px 26px;opacity:0;transition:none;white-space:nowrap";
+    document.body.appendChild(cap);
+    window.__caption = text => { cap.textContent = text; cap.style.opacity = text ? 1 : 0; };
     window.__moveCur = (gx, gy, down) => {
       const r = game.canvas.getBoundingClientRect();
       __cur.gx = gx; __cur.gy = gy;
@@ -68,7 +79,11 @@ try {
   await scenario(rec);
   if (cdp.errors.length) console.log("console errors:", cdp.errors.join(" | "));
   mkdirSync(dirname(resolve(outPath)), { recursive: true });
-  execFileSync("ffmpeg", ["-y", "-loglevel", "error", "-framerate", String(FPS), "-i", join(frames, "f%05d.png"),
+  if (outPath.endsWith(".mp4")) {
+    execFileSync("ffmpeg", ["-y", "-loglevel", "error", "-framerate", String(FPS), "-i", join(frames, "f%05d.png"),
+      "-c:v", "libx264", "-pix_fmt", "yuv420p", "-crf", "18", "-preset", "slow", "-movflags", "+faststart", resolve(outPath)]);
+    writeFileSync(resolve(outPath) + ".events.json", JSON.stringify({ fps: FPS, frames: n, events }, null, 1));
+  } else execFileSync("ffmpeg", ["-y", "-loglevel", "error", "-framerate", String(FPS), "-i", join(frames, "f%05d.png"),
     "-vf", `scale=${WIDTH}:-1:flags=lanczos,split[a][b];[a]palettegen=max_colors=200:stats_mode=diff[p];[b][p]paletteuse=dither=bayer:bayer_scale=4:diff_mode=rectangle`,
     resolve(outPath)]);
   if (process.argv.includes("--keep")) execFileSync("cp", ["-R", frames, resolve(outPath) + ".frames"]);

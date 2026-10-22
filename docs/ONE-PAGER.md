@@ -16,7 +16,7 @@ Read a bubble, use a verb (lid, lamp, mist, buy), then watch a bar and a creatur
 | # | Who | Ask | Done when | Reward | Teaches |
 |---|---|---|---|---|---|
 | 1 | Hazel (hedgehog) | "Make my jar glow?" | Dot glows, not sad, lamp off, held 0.05 d | +4, speed button | all four verbs |
-| 2 | Mo (mole) | "Moss on 40% of the floor!" | moss cover >= 40% | +4, unlocks Springtail | light + damp grows moss; the lamp makes Dot sulk |
+| 2 | Mo (mole) | "Moss on 35% of the floor!" | moss cover >= 35% | +4, unlocks Springtail | light + damp grows moss; the lamp makes Dot sulk |
 | 3 | Olive (owl) | "3 fireflies glowing for 4 hours!" (she brings one firefly) | >= 3 glowing, none sad, held 0.17 d (pauses by day) | +3, unlocks Mushroom | darkness, damp |
 | 4 | Fen (frog) | "Soggy leaves! Mould under 1%?" | after a staged leaf dump: mould < 1%, held 0.5 d | +4, unlocks Fern | fresh air or mushrooms beat mould |
 | 5 | Hazel | "Every kind, nobody sad, lid shut a day!" | 6 kinds, none sad, lid shut, mould < 5%, held 1 d | +4 | a shut jar makes its own air |

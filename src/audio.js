@@ -21,9 +21,18 @@ const Audio = {
     return this.muted;
   },
 
+  // boot loads only the small SFX; the music and ambience (most of the bytes) stream in on the title screen
   load(scene) {
     if (NO_AUDIO) return;
-    for (const k of [...SFX, ...LOOPS]) scene.load.audio(k, [`assets/audio/${k}.ogg`, `assets/audio/${k}.mp3`]);
+    for (const k of SFX) scene.load.audio(k, [`assets/audio/${k}.ogg`, `assets/audio/${k}.mp3`]);
+  },
+  loadBeds(scene, done) {
+    if (NO_AUDIO) return;
+    const todo = LOOPS.filter(k => !scene.cache.audio.exists(k));
+    if (!todo.length) return done?.();
+    for (const k of todo) scene.load.audio(k, [`assets/audio/${k}.ogg`, `assets/audio/${k}.mp3`]);
+    scene.load.once("complete", () => done?.());
+    scene.load.start();
   },
 
   sfx(scene, key, { rate = 1, volume = 0.5, delay = 0 } = {}) {

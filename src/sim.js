@@ -14,6 +14,7 @@
   const ANIMALS = ["snail", "springtail", "firefly"];
   const FIREFLY_BREED = 0; // fireflies are bought, never born (rand draw kept for the RNG stream)
   const MOSS_PAY = 5;      // moss pays a seed at >= 25% floor cover
+  const PLURAL = { moss: "moss", springtail: "springtails", fern: "ferns", mushroom: "mushrooms", snail: "snails", firefly: "fireflies" };
   const CAP = { snail: 6, springtail: 24, firefly: 6, mushroom: 6, fern: 4 };
 
   const clamp = (v, a = 0, b = 1) => Math.max(a, Math.min(b, v));
@@ -71,12 +72,19 @@
   function place(s, kind, x, y) {
     const k = KINDS[kind];
     if (!k || s.seeds < k.cost) return { ok: false, why: "not enough seeds" };
-    if (CAP[kind] && count(s, kind) >= CAP[kind]) return { ok: false, why: "jar is full of " + k.name.toLowerCase() + "s" };
+    if (CAP[kind] && count(s, kind) >= CAP[kind]) return { ok: false, why: "the jar is full of " + PLURAL[kind] };
     s.seeds -= k.cost;
     if (kind === "moss") {
-      const i = slotOf(x);
-      s.slots[i].moss = Math.max(s.slots[i].moss, 0.35);
+      // a tap on an existing tuft plants on the nearest bare soil instead (never pays for nothing)
+      let i = slotOf(x);
+      if (s.slots[i].moss >= 0.45) {
+        const bare = s.slots.map((sl, j) => j).filter(j => s.slots[j].moss < 0.45).sort((a, b) => Math.abs(a - i) - Math.abs(b - i))[0];
+        if (bare === undefined) { s.seeds += k.cost; return { ok: false, why: "the floor is already all moss" }; }
+        i = bare;
+      }
+      s.slots[i].moss = Math.max(s.slots[i].moss, 0.5);
       s.slots[i].mould *= 0.5;
+      return { ok: true, slot: i };
     } else {
       spawn(s, kind, kind === "fern" ? clamp(x, 0.12, 0.88) : x, y); // fern fronds would poke through the curved walls
     }
@@ -196,7 +204,7 @@
         if (s.hum < 45) why.push("too dry");
         if (s.air < 35) why.push("stuffy air");
         if (e.food < 0.15) why.push("hungry");
-        breed = e.food > 0.75 && e.hp > 0.8 && e.age > 1.5 && rand(s) < 0.35 * dt;
+        breed = e.food > 0.75 && e.hp > 0.8 && e.age > 1.5 && rand(s) < 0.35 * dt && s.air > 50; // no babies in stale air
       } else if (e.kind === "springtail") {
         if (rand(s) < 3 * dt) e.dir = rand(s) < 0.5 ? -1 : 1;
         e.x = clamp(e.x + e.dir * 0.8 * dt, 0.03, 0.97);

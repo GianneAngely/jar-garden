@@ -47,3 +47,45 @@ Tes: UI 30/30 (file://) sama 32/32 (http WebGL + `--audio`), request 37/37, sim 
 - Ada loading bar "Growing the jar..." biar ga ada layar kosong pas audio lagi dimuat.
 
 **Butuh Angel (opsional, kapan aja):** dengerin `docs/m4/sound-preview.mp4`. Kalau ada yang ga cocok, sebut aja namanya. Ada cadangan di shortlist, jadi gantinya tinggal 1 baris.
+
+## Playtest ronde 2 + polish (22 Okt)
+Playtest 4 persona (juri 3 menit, pemain sampai tamat, kritikus visual, pemburu bug) di Chrome headless mute + `?audiotest`.
+- Hasil: 0 error konsol, 0 softlock, 0 leak (40 makhluk di free play aman), frame 16,7 ms stabil.
+- Penilaian juri: tema simulasi 4,5/5, presentasi 4,5/5, fun 3,5/5. Titik lemahnya catatan Mo yang makan 85–138 detik dari sesi 3 menit.
+- 8 dari 8 masalah top berhasil direproduksi, terus semuanya dibenerin.
+
+**Dibenerin:**
+- Ketukan tanam ga hilang lagi. Kartu toko selalu milih (ga toggle). Lumut yang diketuk di atas lumut pindah ke tanah kosong terdekat, jadi ga bayar sia-sia, dan muncul "+2.5%". Ketuk toples tanpa pilihan munculin "Pick something in the shop first".
+- Catatan Mo:
+  - target diturunin dari 40% ke 35%
+  - satu tanaman lumut sekarang 0,5 (sebelumnya 0,35)
+  - game otomatis 2x setelah onboarding ("Time now runs 2x")
+  - petunjuknya ngikut keadaan ("Plant more moss: 1 seed each", "Moss grows in light. Try 4x!")
+  - hasilnya: pemain pasif yang nanam 4 lumut sekitar 50 detik (sebelumnya 3,5 menit di 1x), pemain engaged median 0,54 hari, pemain diem tetap ga lolos
+- Tombol speed muter 1x/2x/4x, Space buat pause.
+- Cap pos ga nutupin ucapan kartu pos lagi.
+- Ketukan nyasar pas momen wow atau ucapan makasih sekarang ga ngapa-ngapain. Tombol speed baru muncul abis makasihnya selesai.
+- Chip: sebab sedih dulu, terus petunjuk, baru "Paused till dusk · try 4x". Hold yang udah selesai nunjukin jam penuh. Olive dapet penghitung jam.
+- Baris sebab ga nyalahin tutup yang udah ditutup, dan cuma sumber yang gede yang ditampilin.
+- Grafik:
+  - skalanya ngikut jumlah data, jadi hari pertama ngisi kotak
+  - labelnya "so far" sampai datanya 15 hari
+- Kabut udara pengap mulai keliatan dari 45%. Angin dari tutup lebih sering.
+- Kunang-kunang jaga jarak 60 px, dan halo-nya diredam kalau banyak yang nyala bareng (ga jadi gumpalan putih).
+- Cuma pesta (catatan terakhir) yang sekarang punya momen gede sendiri: ruangan meredup, kamera mendekat, cahaya penuh toples, kilau + hati dari tiap kunang-kunang.
+- Grid toko sekarang di tengah panel, dan "Mushroom" muat di kartunya.
+- Teks dirender di resolusi layar (tajam di retina).
+- Ikon mute digambar tangan (bukan emoji).
+- Tutup gabus, lampu, sama portrait ikut redup pas malam.
+- Overlay bisa ditutup pakai Enter/Space.
+- Toast kabut nunjukin angka asli ("Already soaked!" kalau udah ≥ 95).
+- "+1" sama "no seed" kebaca di malam hari.
+- "+0 at midnight" disembunyiin.
+- Free play: Rewind balik ke pagi hari ini, dan siput ga beranak lagi kalau udara < 50 (sebelumnya jumlahnya meledak terus mati semua).
+- Musik dimuat di belakang layar pas layar judul. Ada teks "Growing the jar..." sebelum JS jalan. Ada kartu "putar HP" buat layar portrait.
+- Typo "fireflys".
+
+**Masih kebuka (kecil):**
+- Baris chip kosong di kartu masih ninggalin celah.
+- Kolase ending masih kecil.
+- Free play belum ada tujuan atau tempat buat ngabisin biji.

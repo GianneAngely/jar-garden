@@ -85,7 +85,10 @@ class Coach {
       px = t.x; py = t.y - 64;
     }
     const w = this.pillW;
-    this.pillBg.setPosition(Phaser.Math.Clamp(px, w / 2 + 10, W - w / 2 - 10), py);
+    // keep the pill off Hazel's face (left) and off the shop labels (right panel)
+    if (t && t.x > 766) { px = 766 - w / 2 - 12; py = t.y - 20; }
+    else px = Phaser.Math.Clamp(px, Math.max(w / 2 + 10, t && t.y > 560 ? 250 + w / 2 : 0), W - w / 2 - 10);
+    this.pillBg.setPosition(px, py);
     this.pillText.setPosition(this.pillBg.x, py);
     // soft pulse behind the panel bar this beat moves
     const g = this.glow.clear(), row = { hum: 0, air: 1, light: 2 }[st.bar];

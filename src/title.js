@@ -24,11 +24,10 @@ class Title extends Phaser.Scene {
     play.list[1].setFontSize(26);
     this.tweens.add({ targets: play, scale: 1.05, yoyo: true, repeat: -1, duration: 900, ease: "Sine.InOut" });
     label(this, 24, 700, "Made for Game Gauntlet: SIM Jam", 15, "#9a7a66");
-    const mute = label(this, W - 34, 34, Audio.muted ? "🔇" : "🔊", 26, COL.ink, 0.5).setInteractive({ useHandCursor: true })
-      .on("pointerup", () => mute.setText(Audio.toggle(this.game) ? "🔇" : "🔊"));
+    muteButton(this, W - 40, 38);
     this.input.keyboard?.once("keydown-ENTER", () => this.go());
     this.input.keyboard?.once("keydown-SPACE", () => this.go());
-    Audio.bed(this, "music", "music-title", 1200);
+    Audio.loadBeds(this, () => this.scene.isActive() && Audio.bed(this, "music", "music-title", 1200));
     window.STATE = "title";
   }
 

@@ -1,6 +1,6 @@
 const DT = 1 / 240;          // sim step (days)
 const DAY_SECONDS = 60;      // real seconds per in-game day at 1x
-const SPEEDS = [1, 2, 4, 0];
+const SPEEDS = [1, 2, 4];
 const SHOP = ["moss", "springtail", "fern", "mushroom", "snail", "firefly"];
 const SPRITES = ["snail", "snail-sad", "springtail", "firefly", "fern", "mushroom", "moss", "mould", "leaves", "lamp", "cork", "soil", "hedgehog", "owl", "frog", "mole"];
 const ICONS = ["spray", "bulb", "lid", "drop", "seed", "sprout", "air", "heart"];
@@ -26,6 +26,21 @@ const hash = (a, b) => { const x = Math.sin(a * 127.1 + b * 311.7) * 43758.5453;
 
 function label(scene, x, y, str, size = 22, color = COL.ink, origin = 0) {
   return scene.add.text(x, y, str, { fontFamily: FONT, fontSize: size + "px", color }).setOrigin(origin, 0.5);
+}
+
+// hand-drawn speaker (the emoji was the only glossy thing on screen); a cross when muted
+function muteButton(scene, x, y) {
+  const g = scene.add.graphics().setDepth(40);
+  const draw = () => {
+    g.clear().fillStyle(COL.card).lineStyle(2.5, COL.inkHex).fillCircle(x, y, 18).strokeCircle(x, y, 18);
+    g.fillStyle(COL.inkHex).fillRect(x - 10, y - 4, 5, 8).fillTriangle(x - 6, y - 4, x - 6, y + 4, x + 1, y - 10).fillTriangle(x - 6, y + 4, x + 1, y - 10, x + 1, y + 10);
+    g.lineStyle(2.5, COL.inkHex);
+    if (Audio.muted) g.lineBetween(x + 4, y - 5, x + 11, y + 5).lineBetween(x + 11, y - 5, x + 4, y + 5);
+    else { g.beginPath().arc(x + 2, y, 6, -0.9, 0.9).strokePath(); g.beginPath().arc(x + 2, y, 11, -0.9, 0.9).strokePath(); }
+  };
+  draw();
+  const hit = scene.add.zone(x, y, 40, 40).setInteractive({ useHandCursor: true }).on("pointerup", () => { Audio.toggle(scene.game); draw(); });
+  return { g, hit };
 }
 
 function button(scene, x, y, w, h, str, icon, onTap) {
@@ -55,6 +70,7 @@ class Boot extends Phaser.Scene {
     const g = this.add.graphics(), t = this.add.text(W / 2, H / 2 - 40, "Growing the jar...", { fontFamily: FONT, fontSize: "26px", color: COL.ink }).setOrigin(0.5);
     this.load.on("progress", p => g.clear().fillStyle(0xe6d5bf).fillRoundedRect(W / 2 - 160, H / 2, 320, 18, 9).fillStyle(0x9fd08a).fillRoundedRect(W / 2 - 160, H / 2, Math.max(18, 320 * p), 18, 9).lineStyle(3, COL.inkHex).strokeRoundedRect(W / 2 - 160, H / 2, 320, 18, 9));
     this.load.once("complete", () => { g.destroy(); t.destroy(); });
+    document.getElementById("boot")?.remove(); // the plain-HTML "Growing the jar..." shown while Phaser itself downloads
     for (const k of SPRITES) this.load.image(k, `assets/${k}.webp`);
     for (const k of ICONS) this.load.image("icon-" + k, `assets/icon-${k}.webp`);
     Audio.load(this);
@@ -84,6 +100,7 @@ class Jar extends Phaser.Scene {
     this.noteSnap = structuredClone(this.s);
     window.jar = this.s;
     this.speedIdx = 0;
+    this.paused = false;
     this.acc = 0;
     this.selected = null;
     this.views = new Map();
@@ -134,6 +151,7 @@ class Jar extends Phaser.Scene {
     this.tipText = label(this, 0, 0, "", 18, COL.ink, 0.5);
     this.tip.add([this.tipBg, this.tipText]);
 
+    Audio.loadBeds(this); // in case the title's background load was cut short by a quick Play
     this.card = new NoteCard(this);
     this.coach = new Coach(this);
     this.thanks = [];
@@ -145,7 +163,7 @@ class Jar extends Phaser.Scene {
     this.lastPayShown = this.s.lastPay?.day;
     this.syncButtons();
     this.input.on("pointerdown", (p, over) => this.tapJar(p, over));
-    this.input.keyboard?.on("keydown-SPACE", () => this.speedBtn.visible && !this.modal && this.cycleSpeed());
+    this.input.keyboard?.on("keydown-SPACE", () => this.speedBtn.visible && !this.modal && this.togglePause());
     this.input.keyboard?.on("keydown-ESC", () => this.select(null));
     window.STATE = "jar";
   }
@@ -178,11 +196,13 @@ class Jar extends Phaser.Scene {
   buildToolbar() {
     const y = 664, cx = JAR.x + JAR.w / 2;
     // during the onboarding only the control the coach points at responds
-    const live = (key, fn) => () => (this.coach.allows(key) ? fn() : this.coach.nudge());
+    const live = (key, fn) => () => (this.thanks.length ? null : this.coach.allows(key) ? fn() : this.coach.nudge());
     this.lidBtn = button(this, cx - 195, y, 122, 40, "Open lid", "lid", live("lid", () => this.toggleLid()));
     this.lampBtn = button(this, cx - 65, y, 122, 40, "Lamp off", "bulb", live("lamp", () => this.toggleLamp()));
     this.mistBtn = button(this, cx + 65, y, 122, 40, "Mist", "spray", live("mist", () => {
-      Sim.mist(this.s); this.puff(); FX.fog(this); this.say("Pssst! +10 humidity");
+      const h0 = this.s.hum;
+      Sim.mist(this.s); this.puff(); FX.fog(this);
+      this.say(h0 >= 95 ? "Already soaked!" : `Pssst! +${Math.round(this.s.hum - h0)} humidity`);
       Audio.sfx(this, "mist", { volume: 0.45 }); Audio.sfx(this, "drip", { volume: 0.25, delay: 0.45, rate: 1.1 });
     }));
     this.speedBtn = button(this, cx + 195, y, 122, 40, "▶ 1x", null, live("speed", () => this.cycleSpeed()));
@@ -197,8 +217,7 @@ class Jar extends Phaser.Scene {
     this.dayText = label(this, 792, 56, "", 28);
     this.add.image(1102, 56, "icon-seed").setScale(30 / 96);
     this.seedText = label(this, 1122, 56, "", 26, COL.ink, 0);
-    this.muteBtn = label(this, 1226, 56, Audio.muted ? "🔇" : "🔊", 24, COL.ink, 0.5).setInteractive({ useHandCursor: true })
-      .on("pointerup", () => this.muteBtn.setText(Audio.toggle(this.game) ? "🔇" : "🔊"));
+    this.muteBtn = muteButton(this, 1222, 56);
 
     this.bars = this.add.graphics();
     // green zones follow the sim's own thresholds for whoever lives in the jar; a number turns red when it is out
@@ -219,7 +238,7 @@ class Jar extends Phaser.Scene {
     this.payText = label(this, 1100, 84, "", 14, "#7a5a48", 0);
 
     this.graph = this.add.graphics();
-    label(this, 792, 272, "last 15 days", 16, "#9a7a66");
+    this.graphLabel = label(this, 792, 272, "last 15 days", 16, "#9a7a66");
     [["humidity", COL.hum], ["air", 0x5fb38a], ["moss", COL.mossBar], ["mould", 0xa79d90]].forEach(([n, c], i) => {
       this.add.rectangle(912 + i * 84, 272, 14, 6, c).setOrigin(0, 0.5);
       label(this, 930 + i * 84, 272, n, 15, "#9a7a66");
@@ -228,12 +247,12 @@ class Jar extends Phaser.Scene {
     this.logText = this.add.text(792, 420, "", { fontFamily: FONT, fontSize: "17px", color: COL.ink, lineSpacing: 4 }).setOrigin(0, 0);
 
     this.cards = SHOP.map((kind, i) => {
-      const cx = 870 + (i % 3) * 156, cy = 556 + Math.floor(i / 3) * 84;
+      const cx = 855 + (i % 3) * 156, cy = 556 + Math.floor(i / 3) * 84;
       const c = this.add.container(cx, cy);
       const bg = this.add.graphics();
       const tex = this.textures.get(kind).getSourceImage();
       const icon = this.add.image(-44, 2, kind).setScale(Math.min(56 / tex.width, 54 / tex.height));
-      const name = label(this, -12, -12, Sim.KINDS[kind].name, 18);
+      const name = label(this, -12, -12, Sim.KINDS[kind].name, 17);
       const n = Sim.KINDS[kind].cost;
       const cost = label(this, -12, 14, n + (n === 1 ? " seed" : " seeds"), 15, "#7a5a48");
       c.add([bg, icon, name, cost]);
@@ -243,7 +262,7 @@ class Jar extends Phaser.Scene {
       c.setSize(146, 74).setInteractive({ useHandCursor: true }).on("pointerup", () => {
         if (!Req.canBuy(this.s, kind)) return this.say(`${Sim.KINDS[kind].name} comes with note ${unlockAt + 1}`);
         if (!this.coach.allows("shop:" + kind)) return this.coach.nudge();
-        this.select(this.selected === kind && !this.coach.active ? null : kind);
+        this.select(kind);
       });
       c.paint = () => {
         const open = Req.canBuy(this.s, kind), on = this.selected === kind, afford = this.s.seeds >= Sim.KINDS[kind].cost;
@@ -296,16 +315,22 @@ class Jar extends Phaser.Scene {
     this.syncButtons();
   }
 
+  // the button cycles 1x, 2x, 4x; Space pauses and resumes
   cycleSpeed() {
+    this.paused = false;
     this.speedIdx = (this.speedIdx + 1) % SPEEDS.length;
-    const sp = this.coach.fast || SPEEDS[this.speedIdx];
-    this.speedBtn.setLabel(sp ? `▶ ${sp}x` : "⏸ paused");
+    this.showSpeed();
   }
+  togglePause() {
+    this.paused = !this.paused;
+    this.showSpeed();
+  }
+  showSpeed() { this.speedBtn.setLabel(this.paused ? "⏸ paused" : `▶ ${SPEEDS[this.speedIdx]}x`); }
 
   tapJar(p, over) {
     if (over.length) return;
     if (!inJar(p.x, p.y)) { this.tip.setVisible(false); if (this.selected && !this.coach.active) this.select(null); return; }
-    if (!this.selected) { if (this.coach.active) this.coach.nudge(); return; }
+    if (!this.selected) { if (this.coach.active) this.coach.nudge(); else if (!this.tip.visible) this.say("Pick something in the shop first"); return; }
     if (!this.coach.allows("jar")) return this.coach.nudge();
     const x = Phaser.Math.Clamp((p.x - JAR.x - 26) / (JAR.w - 52), 0, 1);
     const y = Phaser.Math.Clamp((JAR.soil - 6 - p.y) / AIR_H, 0.25, 0.85);
@@ -313,8 +338,12 @@ class Jar extends Phaser.Scene {
     if (r.ok) {
       Audio.sfx(this, "plop", { rate: { moss: 1.25, springtail: 1.15, fern: 0.85, mushroom: 0.95 }[this.selected] || 1 });
       if (this.selected === "firefly") FX.sparkle(this, p.x, p.y, 6);
-      else FX.dust(this, this.selected === "moss" ? jx(Sim.slotX(Sim.slotOf(x))) : jx(x), JAR.soil);
-      if (this.selected === "moss") this.prevMoss[Sim.slotOf(x)] = 1; // placed, not spread: no spread sparkle
+      else FX.dust(this, this.selected === "moss" ? jx(Sim.slotX(r.slot)) : jx(x), JAR.soil);
+      if (this.selected === "moss") {
+        this.prevMoss[r.slot] = 1; // placed, not spread: no spread sparkle
+        const t = label(this, jx(Sim.slotX(r.slot)), JAR.soil - 40, "+2.5%", 15, COL.ink, 0.5).setDepth(55).setStroke("#fff8ef", 4);
+        this.tweens.add({ targets: t, y: t.y - 26, alpha: 0, delay: 300, duration: 900, onComplete: () => t.destroy() });
+      }
     }
     if (r.ok) { if (!this.coach.active) this.say(`${Sim.KINDS[this.selected].name} added!`); this.selected = this.s.seeds >= Sim.KINDS[this.selected].cost ? this.selected : null; }
     else this.say("Can't: " + r.why);
@@ -349,12 +378,15 @@ class Jar extends Phaser.Scene {
     const note = this.thanks[0];
     this.time.delayedCall(wait, () => this.snapJar("pc-" + note.id, photo => {
       Audio.sfx(this, "note-done", { volume: 0.55 });
-      const lead = note.id === "glow" ? this.firstGlow() : 0;
+      const lead = note.id === "glow" ? this.firstGlow() : note.id === "party" ? this.partyGlow() : 0;
       this.time.delayedCall(lead, () => this.card.celebrate(note, () => {
         if (note.unlock === "speed") {
+          // from here on the jar runs at 2x (playtest: judges stay at 1x and wait); the button changes it
+          this.speedIdx = 1;
+          this.showSpeed();
           this.speedBtn.setVisible(true).setScale(0);
           this.tweens.add({ targets: this.speedBtn, scale: 1, duration: 400, ease: "Back.Out" });
-          this.say("Speed unlocked! Try 2x.");
+          this.say("Time now runs 2x. Tap ▶ to change it.");
           Audio.sfx(this, "unlock", { volume: 0.45 });
         } else if (note.unlock) {
           this.tweens.add({ targets: this.cards[SHOP.indexOf(note.unlock)], scale: 1.12, yoyo: true, repeat: 1, duration: 220 });
@@ -366,6 +398,23 @@ class Jar extends Phaser.Scene {
         else if (this.s.req.won) this.showWin();
       }, Math.floor(this.s.day) + 1, photo));
     }));
+  }
+
+  // The finale: every glowing firefly sparkles, a bloom fills the jar, the room dims and the camera leans in
+  partyGlow() {
+    const cam = this.cameras.main;
+    Audio.sfx(this, "glow", { volume: 0.6 });
+    this.tweens.add({ targets: this, dim: 0.25, duration: 600, yoyo: true, hold: 1600 });
+    cam.pan(580, 370, 800, "Sine.easeInOut");
+    cam.zoomTo(1.1, 800, "Sine.easeInOut");
+    const bloom = this.add.image(JAR.x + JAR.w / 2, 380, "glow").setScale(2).setTint(0xffd27a).setBlendMode(Phaser.BlendModes.ADD).setAlpha(0).setDepth(22);
+    this.tweens.add({ targets: bloom, scale: 8, alpha: { from: 0, to: 0.38 }, duration: 1000, yoyo: true, hold: 900, ease: "Sine.InOut", onComplete: () => bloom.destroy() });
+    this.s.ents.filter(e => e.glow).forEach((e, i) => {
+      const v = this.views.get(e.id);
+      if (v) this.time.delayedCall(200 + i * 160, () => { FX.sparkle(this, v.c.x, v.c.y, 10, 0xffe680, 60); FX.hearts(this, v.c.x, v.c.y - 16, 3, 30); });
+    });
+    this.time.delayedCall(2300, () => { cam.pan(W / 2, H / 2, 700, "Sine.easeInOut"); cam.zoomTo(1, 700, "Sine.easeInOut"); });
+    return 3000;
   }
 
   // The wow beat after Hazel's note: dim the room, lean the camera in on the jar, let Dot sparkle. Returns its
@@ -431,7 +480,7 @@ class Jar extends Phaser.Scene {
     at.forEach(([x, y], i) => {
       this.pendingSeeds++;
       const sd = this.add.image(x, y, "icon-seed").setScale(0.24).setDepth(55).setAlpha(0);
-      const plus = label(this, x + 16, y - 40, "+1", 16, COL.ink, 0.5).setDepth(55).setAlpha(0);
+      const plus = label(this, x + 30, y - 40, "+1", 18, "#fff8ef", 0.5).setStroke(COL.ink, 4).setDepth(55).setAlpha(0);
       this.tweens.add({ targets: plus, alpha: 1, y: y - 56, duration: 380, delay: i * 160, yoyo: true, hold: 300 });
       this.tweens.chain({ targets: sd, tweens: [
         { alpha: 1, y: y - 36, scale: 0.34, duration: 380, delay: i * 160, ease: "Back.Out" },
@@ -441,7 +490,7 @@ class Jar extends Phaser.Scene {
     for (const e of s.ents.filter(o => o.mood === "sad" && Sim.ANIMALS.includes(o.kind)).slice(0, 3)) {
       const v = this.views.get(e.id);
       if (!v) continue;
-      const t = label(this, v.c.x, v.c.y - 50, "no seed", 14, "#9a7a66", 0.5).setDepth(55);
+      const t = label(this, v.c.x, v.c.y - 50, "no seed", 15, "#fff8ef", 0.5).setStroke(COL.ink, 4).setDepth(55);
       this.tweens.add({ targets: t, y: t.y - 24, alpha: 0, delay: 500, duration: 1400, onComplete: () => t.destroy() });
     }
   }
@@ -482,7 +531,7 @@ class Jar extends Phaser.Scene {
     this.lampBtn.setLabel(s.lamp ? "Lamp off" : "Lamp on"); // the action, like the lid button; yellow = lamp is on
     this.lampBtn.setOn(s.lamp);
     this.lampBtn.list[2].setAlpha(s.lamp ? 1 : 0.45);
-    this.speedBtn.setVisible(s.req.perks.includes("speed"));
+    if (!this.thanks?.length) this.speedBtn.setVisible(s.req.perks.includes("speed")); // revealed by its thank-you
   }
 
   // a centred card over a dim screen, used for lose and (until M3c) the win
@@ -491,7 +540,7 @@ class Jar extends Phaser.Scene {
     const dim = this.add.rectangle(0, 0, W, H, 0x2b2036, 0.45).setOrigin(0).setInteractive();
     const g = this.add.graphics().fillStyle(COL.card).lineStyle(4, COL.inkHex).fillRoundedRect(W / 2 - 230, 210, 460, 260, 22).strokeRoundedRect(W / 2 - 230, 210, 460, 260, 22);
     const t = label(this, W / 2, 260, title, 30, COL.ink, 0.5);
-    const b = this.add.text(W / 2, 320, body, { fontFamily: FONT, fontSize: "19px", color: COL.ink, align: "center", wordWrap: { width: 400 } }).setOrigin(0.5, 0.5);
+    const b = this.add.text(W / 2, 320, body, { fontFamily: FONT, fontSize: "19px", color: COL.ink, align: "center", wordWrap: { width: 420 } }).setOrigin(0.5, 0.5);
     const btn = button(this, W / 2, 415, 180, 46, btnText, null, () => { this.closeModal(o); onTap(); });
     o.add([dim, g, t, b, btn]);
     this.armButtons([btn]);
@@ -512,16 +561,20 @@ class Jar extends Phaser.Scene {
   }
   armButtons(btns) {
     btns.forEach(b => b.disableInteractive());
-    this.time.delayedCall(600, () => btns.forEach(b => b.setInteractive({ useHandCursor: true })));
+    this.time.delayedCall(600, () => {
+      btns.forEach(b => b.setInteractive({ useHandCursor: true }));
+      const kb = this.input.keyboard, go = () => { if (btns[0].active) btns[0].emit("pointerup"); kb?.off("keydown-ENTER", go); kb?.off("keydown-SPACE", go); };
+      kb?.once("keydown-ENTER", go); kb?.once("keydown-SPACE", go);
+    });
   }
 
   showLose(tip) {
     Audio.sfx(this, "lose", { volume: 0.5 });
     this.overlay("The jar went quiet", `No animals are left.\nTip: ${tip}`, "Rewind", () => {
       this.loadJar(structuredClone(this.noteSnap));
-      this.speedIdx = 0;
-      this.speedBtn.setLabel("▶ 1x");
-      this.say(this.s.req.won ? "Back to your last postcard." : "Back to the start of this note.");
+      this.paused = false;
+      this.showSpeed();
+      this.say(this.s.req.won ? "Back to this morning." : "Back to the start of this note.");
     });
   }
 
@@ -548,7 +601,7 @@ class Jar extends Phaser.Scene {
 
   // Frame --------------------------------------------------------------------
   update(time, delta) {
-    const sp = this.coach.fast || SPEEDS[this.speedIdx];
+    const sp = this.coach.fast || (this.paused ? 0 : SPEEDS[this.speedIdx]);
     this.acc += (delta / 1000) * sp / DAY_SECONDS;
     if (this.thanks.length || this.modal) this.acc = 0; // the jar holds still during a thank-you or an overlay
     for (let n = 0; this.acc >= DT && n < 60 && !this.s.req.lost; n++) {
@@ -564,9 +617,12 @@ class Jar extends Phaser.Scene {
     this.bgNight.setAlpha(dusk);
     // nights are darker with the lamp off, so the fireflies carry the light
     this.night.setFillStyle(COL.night, Math.min(0.8, dusk * (s.lamp ? 0.38 : 0.5) + this.dim));
-    this.haze.setAlpha(Phaser.Math.Clamp((35 - s.air) / 35, 0, 1) * 0.35);
+    const shade = Phaser.Display.Color.Interpolate.ColorWithColor({ r: 255, g: 255, b: 255 }, { r: 140, g: 150, b: 190 }, 1, s.lamp ? dusk * 0.5 : dusk);
+    const tint = Phaser.Display.Color.GetColor(shade.r, shade.g, shade.b);
+    this.lid.setTint(tint); this.lamp.setTint(tint); this.card.people.each(im => im.setTint(tint));
+    this.haze.setAlpha(Phaser.Math.Clamp((45 - s.air) / 45, 0, 1) * 0.45);
     this.dew.setAlpha(Phaser.Math.Clamp((s.hum - 85) / 12, 0, 1));
-    if (s.lid && time > this.nextWisp) { FX.airWisp(this); this.nextWisp = time + 380; }
+    if (s.lid && time > this.nextWisp) { FX.airWisp(this); this.nextWisp = time + 240; }
     if (time > this.nextSpore) {
       this.nextSpore = time + 260;
       const i = Math.floor(Math.random() * Sim.N);
@@ -577,6 +633,7 @@ class Jar extends Phaser.Scene {
     const nightNow = dusk > 0.5;
     Audio.bed(this, "music", nightNow ? "music-night" : "music-day");
     Audio.bed(this, "amb", nightNow ? "amb-night" : "amb-day");
+    this.glowCount = s.ents.filter(e => e.glow).length;
     const glowing = s.ents.some(e => e.glow && e.mood !== "sad");
     if (glowing && !this.wasGlowing && Req.current(s)?.id !== "glow") Audio.sfx(this, "glow", { volume: 0.3 });
     this.wasGlowing = glowing;
@@ -651,7 +708,7 @@ class Jar extends Phaser.Scene {
         const a = e.glow ? (sad ? 0.3 : 1) * (0.75 + 0.25 * Math.sin(time / 280 + e.id * 2)) : 0;
         v.glow.x = v.halo.x = -12 * dir;
         v.glow.setAlpha(a);
-        v.halo.setAlpha(a * 0.28);
+        v.halo.setAlpha(a * 0.28 / Math.sqrt(Math.max(1, this.glowCount || 1)));
       }
 
       const icon = e.why ? WHY_ICON[e.why] || "drop" : "";
@@ -673,7 +730,7 @@ class Jar extends Phaser.Scene {
     const flies = this.s.ents.filter(e => e.kind === "firefly").map(e => this.views.get(e.id)).filter(Boolean);
     for (let a = 0; a < flies.length; a++) for (let b = a + 1; b < flies.length; b++) {
       const A = flies[a].c, B = flies[b].c, dx = B.x - A.x, dy = B.y - A.y, d = Math.hypot(dx, dy) || 1;
-      if (d < 40) { const push = (40 - d) * 0.25; A.x -= dx / d * push; A.y -= dy / d * push; B.x += dx / d * push; B.y += dy / d * push; }
+      if (d < 60) { const push = (60 - d) * 0.2; A.x -= dx / d * push; A.y -= dy / d * push; B.x += dx / d * push; B.y += dy / d * push; }
     }
     for (const [id, v] of this.views) {
       if (alive.has(id)) continue;
@@ -687,7 +744,11 @@ class Jar extends Phaser.Scene {
   drawPanel() {
     const s = this.s;
     this.dayText.setText(`Day ${Math.floor(s.day) + 1} · ${clock(s.day)}`);
-    if (s.lastPay && s.lastPay.day !== this.lastPayShown) { this.lastPayShown = s.lastPay.day; this.payPops(s.lastPay); }
+    if (s.lastPay && s.lastPay.day !== this.lastPayShown) {
+      this.lastPayShown = s.lastPay.day;
+      this.payPops(s.lastPay);
+      if (s.req.won && s.ents.some(e => Sim.ANIMALS.includes(e.kind))) this.noteSnap = structuredClone(s); // free play: Rewind to this morning
+    }
     this.seedText.setText(String(Math.max(0, s.seeds - this.pendingSeeds)));
     const vals = { hum: s.hum, air: s.air, light: Sim.light(s) * 100, mould: (Sim.mouldTotal(s) / Sim.N) * 100 };
     const dry = { moss: 30, snail: 45, firefly: 50, fern: 50, springtail: 55, mushroom: 55 };
@@ -709,26 +770,29 @@ class Jar extends Phaser.Scene {
     });
 
     const g = this.graph.clear(), gx = 792, gy = 292, gw = 440, gh = 110;
+    this.graphLabel.setText(s.history.length >= 150 ? "last 15 days" : "so far");
     g.fillStyle(0xfffdf8).lineStyle(2, COL.inkHex, 0.5).fillRoundedRect(gx, gy, gw, gh, 10).strokeRoundedRect(gx, gy, gw, gh, 10);
     const hst = s.history;
     for (const [key, col] of [["hum", COL.hum], ["air", 0x5fb38a], ["moss", COL.mossBar], ["mould", 0xa79d90]]) {
-      if (hst.length < 5) break;
+      if (hst.length < 3) break;
       g.lineStyle(3, col).beginPath();
       hst.forEach((h, i) => {
-        const px = gx + 8 + (i / 149) * (gw - 16), py = gy + gh - 8 - (h[key] / 100) * (gh - 16);
+        const px = gx + 8 + (i / Math.max(hst.length - 1, 29)) * (gw - 16), py = gy + gh - 8 - (h[key] / 100) * (gh - 16);
         i ? g.lineTo(px, py) : g.moveTo(px, py);
       });
       g.strokePath();
     }
     this.logText.setText(s.log.slice(0, 4).map(l => "· " + l.text).join("\n"));
     ["hum", "air"].forEach((k, i) => {
-      const f = Object.entries(s.flux?.[k] || {}).filter(([, v]) => Math.abs(v) >= 1);
+      const all = Object.entries(s.flux?.[k] || {}).filter(([n]) => n !== "lid" || s.lid);
+      const big = Math.max(1, ...all.map(([, v]) => Math.abs(v)));
+      const f = all.filter(([, v]) => Math.abs(v) >= Math.max(1, big * 0.1));
       const up = f.filter(([, v]) => v > 0).sort((a, b) => b[1] - a[1]).slice(0, 2).map(([n]) => FLUX_NAME[n]);
       const down = f.filter(([, v]) => v < 0).sort((a, b) => a[1] - b[1]).slice(0, 2).map(([n]) => FLUX_NAME[n]);
       this.causeText[i].setText([up.length ? "▲ " + up.join(", ") : "", down.length ? "▼ " + down.join(", ") : ""].filter(Boolean).join("   "));
     });
     const pay = Req.paying(s);
-    this.payText.setText(`+${pay.length} at midnight`);
+    this.payText.setText(pay.length && !this.coach.active ? `+${pay.length} at midnight` : "");
     const q = this.thanks[0]; // a finished note waiting for its thank-you stays on the card, full
     const pr = q ? { note: q, goal: q.goal(s), p: 1, paused: false } : Req.progress(s);
     if (pr) this.card.refresh(pr, Req.NOTES.indexOf(pr.note), Req.NOTES.length);

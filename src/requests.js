@@ -5,6 +5,7 @@
   const SPECIES = ["moss", "springtail", "fern", "mushroom", "snail", "firefly"];
   const START_SHOP = ["moss", "snail", "firefly"];
   const PILES = [3, 4, 5, 12, 13, 14]; // where Fen drops the soggy leaves
+  const MOSS_GOAL = 0.35;              // Mo's carpet (playtest: 40% ate half a judge's session)
 
   const night = s => Sim.isNight(s);
   const glowing = s => s.ents.filter(e => e.kind === "firefly" && e.glow && e.mood !== "sad").length;
@@ -43,11 +44,13 @@
       },
     },
     {
-      id: "moss", who: "mole", name: "Mo", ask: "Moss on 40% of the floor!", line: "So soft! I dream of a moss carpet.", thanks: "Soft! So soft! My paws are so happy.",
+      id: "moss", who: "mole", name: "Mo", ask: "Moss on 35% of the floor!", line: "So soft! I dream of a moss carpet.", thanks: "Soft! So soft! My paws are so happy.",
       reward: 4, unlock: "springtail",
       goal(s) {
         const c = Sim.mossTotal(s) / Sim.N;
-        return { ok: c >= 0.4, p: Math.min(1, c / 0.4), text: `Moss ${Math.round(c * 100)}% / 40%`, dots: s.slots.map(sl => sl.moss), hint: "Plant moss: light + damp grow it" };
+        // the hint follows what would help right now: plant more, or wait for light
+        const hint = s.seeds >= 1 ? "Plant more moss: 1 seed each" : night(s) && !s.lamp ? "Moss grows in light. Try 4x!" : "Light + damp grow moss";
+        return { ok: c >= MOSS_GOAL, p: Math.min(1, c / MOSS_GOAL), text: `Moss ${Math.round(c * 100)}% / ${Math.round(MOSS_GOAL * 100)}%`, dots: s.slots.map(sl => sl.moss), hint };
       },
     },
     {

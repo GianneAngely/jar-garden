@@ -1,6 +1,11 @@
 // file:// (double-click index.html): WebGL refuses local images, so use Canvas there.
 const LOCAL = location.protocol === "file:";
 
+const addText = Phaser.GameObjects.GameObjectFactory.prototype.text;
+Phaser.GameObjects.GameObjectFactory.prototype.text = function (x, y, text, style = {}) {
+  return addText.call(this, x, y, text, { resolution: Math.min(2, window.devicePixelRatio || 1), ...style });
+};
+
 const game = new Phaser.Game({
   type: LOCAL && !QS.has("gl") ? Phaser.CANVAS : Phaser.AUTO,
   parent: "game",
