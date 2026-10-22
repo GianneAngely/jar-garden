@@ -75,6 +75,12 @@ await shot("3-postcard.png");
 if (server) check(await evaluate(`game.renderer.type === Phaser.WEBGL && game.textures.exists("pc-glow")`), "WebGL over http: jar photo taken for the postcard");
 check(await waitFor(`game.scene.getScene("Jar").card.ask.text.startsWith("Moss on 35%") && game.scene.getScene("Jar").speedBtn.visible`, 9000), "postcard, then Mo's note arrives, speed unlocked");
 await shot("3b-note2.png");
+await click(1178, 56);                 // "?" opens the jar guide
+check(await waitFor(`game.scene.getScene("Jar").modal === true`, 3000), "jar guide opens from the ? button");
+await shot("3c-guide.png");
+await sleep(700);
+await click(640, 648);                 // Got it
+check(await waitFor(`!game.scene.getScene("Jar").modal`, 3000), "jar guide closes");
 await click(870 + 312, 556);           // fern card, still locked
 check(await evaluate(`game.scene.getScene("Jar").selected === null && game.scene.getScene("Jar").toastText.text.includes("note 4")`), "locked shop card explains when it opens");
 

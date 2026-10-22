@@ -20,6 +20,7 @@ const clock = day => {
   const m = Math.floor((day % 1) * 24 * 60), h = Math.floor(m / 60);
   return `${(h + 11) % 12 + 1}:${String(m % 60).padStart(2, "0")} ${h < 12 ? "AM" : "PM"}`;
 };
+const SEED_AT = { x: 1060, y: 56 }; // the seed counter, where flying seeds land
 const barY = i => 102 + i * 44; // panel bar rows (room under Humidity and Fresh air for their cause line)
 const FLUX_NAME = { lid: "open lid", plants: "plants", animals: "animals", mould: "mould", glass: "glass" };
 const hash = (a, b) => { const x = Math.sin(a * 127.1 + b * 311.7) * 43758.5453; return x - Math.floor(x); };
@@ -215,8 +216,13 @@ class Jar extends Phaser.Scene {
     g.fillStyle(COL.card).lineStyle(4, COL.inkHex).fillRoundedRect(766, 20, 490, 676, 22).strokeRoundedRect(766, 20, 490, 676, 22);
     this.barGlow = this.add.graphics(); // the coach's highlight, under the bars
     this.dayText = label(this, 792, 56, "", 28);
-    this.add.image(1102, 56, "icon-seed").setScale(30 / 96);
-    this.seedText = label(this, 1122, 56, "", 26, COL.ink, 0);
+    this.add.image(SEED_AT.x, SEED_AT.y, "icon-seed").setScale(30 / 96);
+    this.seedText = label(this, SEED_AT.x + 20, 56, "", 26, COL.ink, 0);
+    // "?": the jar guide (every species' needs and what the bubbles mean)
+    const help = this.add.graphics().fillStyle(COL.card).lineStyle(2.5, COL.inkHex).fillCircle(1178, 56, 18).strokeCircle(1178, 56, 18);
+    label(this, 1178, 55, "?", 22, COL.ink, 0.5);
+    this.add.zone(1178, 56, 40, 40).setInteractive({ useHandCursor: true })
+      .on("pointerup", () => (this.coach.active || this.modal || this.thanks.length ? null : (Audio.sfx(this, "click", { volume: 0.35 }), showGuide(this))));
     this.muteBtn = muteButton(this, 1222, 56);
 
     this.bars = this.add.graphics();
@@ -235,7 +241,7 @@ class Jar extends Phaser.Scene {
     // cause lines: what is pushing humidity and fresh air up or down right now (sim s.flux, per day)
     this.causeText = ["hum", "air"].map((k, i) => label(this, 916, barY(i) + 20, "", 13, "#7a5a48"));
     // the next payday, live: which kinds are happy enough to pay a seed at midnight
-    this.payText = label(this, 1100, 84, "", 14, "#7a5a48", 0);
+    this.payText = label(this, SEED_AT.x - 2, 84, "", 14, "#7a5a48", 0);
 
     this.graph = this.add.graphics();
     this.graphLabel = label(this, 792, 272, "last 15 days", 16, "#9a7a66");
@@ -484,7 +490,7 @@ class Jar extends Phaser.Scene {
       this.tweens.add({ targets: plus, alpha: 1, y: y - 56, duration: 380, delay: i * 160, yoyo: true, hold: 300 });
       this.tweens.chain({ targets: sd, tweens: [
         { alpha: 1, y: y - 36, scale: 0.34, duration: 380, delay: i * 160, ease: "Back.Out" },
-        { x: 1102, y: 56, scale: 0.2, duration: 650, delay: 200, ease: "Cubic.In", onComplete: () => { sd.destroy(); plus.destroy(); this.bumpSeeds(); } },
+        { x: SEED_AT.x, y: SEED_AT.y, scale: 0.2, duration: 650, delay: 200, ease: "Cubic.In", onComplete: () => { sd.destroy(); plus.destroy(); this.bumpSeeds(); } },
       ] });
     });
     for (const e of s.ents.filter(o => o.mood === "sad" && Sim.ANIMALS.includes(o.kind)).slice(0, 3)) {
@@ -590,9 +596,17 @@ class Jar extends Phaser.Scene {
       o.add(pc);
       pc.setAlpha(0).y += 30;
       this.tweens.add({ targets: pc, alpha: 1, y: 336, delay: 300 + i * 140, duration: 420, ease: "Back.Out" });
+      // tap a postcard to read it big, tap again to put it back
+      const home = { x: pc.x, angle: pc.angle };
+      pc.setSize(250, 318).setInteractive({ useHandCursor: true }).on("pointerup", () => {
+        const big = pc.scale > 0.7;
+        o.bringToTop(pc);
+        this.tweens.add({ targets: pc, x: big ? home.x : W / 2, y: big ? 336 : 360, scale: big ? 0.6 : 1.45, angle: big ? home.angle : 0, duration: 320, ease: "Back.Out" });
+      });
     });
     const kinds = Req.SPECIES.filter(k => Req.species(s)[k].n > 0).length;
     const days = s.req.days?.at(-1) ?? Math.floor(s.day) + 1;
+    o.add(label(this, W / 2, 470, "Tap a postcard to read it.", 15, "#9a7a66", 0.5));
     o.add(label(this, W / 2, 506, `${days} days · ${s.born} ${s.born === 1 ? "baby" : "babies"} born · ${kinds} kinds living together`, 20, COL.ink, 0.5));
     const keep = button(this, W / 2, 580, 220, 50, "Keep playing", null, () => this.closeModal(o));
     o.add(keep);

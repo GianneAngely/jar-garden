@@ -1,0 +1,37 @@
+// Jar guide: the rules of the sim on one card (who needs what, who makes and eats what, what each bubble means),
+// so a judge who likes systems can read the whole model in ten seconds. Opened from the "?" in the panel.
+const GUIDE = [
+  ["moss", "Moss", "Grows in light when damp (45-95%).", "Makes fresh air and damp. Spreads.", "Dries out under 30%; mould smothers it."],
+  ["springtail", "Springtail", "Needs damp (55%+).", "Eats mould and leftovers.", "Breeds fast when fed."],
+  ["fern", "Fern", "Needs light and damp (50%+).", "Big fresh-air maker.", "Drops old leaves."],
+  ["mushroom", "Mushroom", "Needs damp (55%+).", "Eats leftovers, keeps mould away.", "Uses a little air."],
+  ["snail", "Snail", "Needs damp (45%+) and fresh air.", "Eats leftovers, then moss.", "Uses lots of air."],
+  ["firefly", "Firefly", "Needs a moss carpet and damp (50%+).", "Glows in the dark.", "Hates the lamp at night."],
+];
+const BUBBLES = [["drop", "too dry: mist"], ["air", "stuffy: open the lid"], ["bulb", "light: lamp on/off"], ["sprout", "needs more moss"], ["leaves", "hungry"]];
+
+function showGuide(sc) {
+  const o = sc.openModal();
+  const dim = sc.add.rectangle(0, 0, W, H, 0x2b2036, 0.5).setOrigin(0).setInteractive();
+  const g = sc.add.graphics().fillStyle(COL.card).lineStyle(4, COL.inkHex).fillRoundedRect(110, 40, 1060, 640, 26).strokeRoundedRect(110, 40, 1060, 640, 26);
+  o.add([dim, g, label(sc, W / 2, 86, "Jar guide", 34, COL.ink, 0.5),
+    label(sc, W / 2, 124, "Lid open: fresh air in, damp out. Lid shut: damp stays, and wet leftovers grow mould.", 18, "#7a5a48", 0.5)]);
+  GUIDE.forEach(([key, name, need, gives, note], i) => {
+    const x = 140 + (i % 2) * 510, y = 158 + Math.floor(i / 2) * 132;
+    const box = sc.add.graphics().fillStyle(0xfffdf8).lineStyle(2, COL.inkHex, 0.5).fillRoundedRect(x, y, 490, 118, 16).strokeRoundedRect(x, y, 490, 118, 16);
+    const tex = sc.textures.get(key).getSourceImage();
+    const icon = sc.add.image(x + 56, y + 59, key).setScale(Math.min(86 / tex.width, 86 / tex.height));
+    o.add([box, icon, label(sc, x + 112, y + 24, name, 21),
+      label(sc, x + 112, y + 52, need, 16), label(sc, x + 112, y + 76, gives, 16, "#4f7a3e"), label(sc, x + 112, y + 99, note, 16, "#9a6a56")]);
+  });
+  const by = 572;
+  o.add(label(sc, 140, by, "Bubbles over a creature say what it needs:", 17, "#7a5a48"));
+  BUBBLES.forEach(([icon, text], i) => {
+    const x = 150 + i * 200, key = icon === "leaves" ? "leaves" : "icon-" + icon, src = sc.textures.get(key).getSourceImage();
+    o.add([sc.add.graphics().fillStyle(0xfffdf8).lineStyle(2, COL.inkHex).fillCircle(x + 14, by + 40, 15).strokeCircle(x + 14, by + 40, 15),
+      sc.add.image(x + 14, by + 40, key).setScale(20 / Math.max(src.width, src.height)), label(sc, x + 36, by + 40, text, 15)]);
+  });
+  const close = button(sc, W / 2, 648, 160, 40, "Got it", null, () => sc.closeModal(o));
+  o.add(close);
+  sc.armButtons([close]);
+}

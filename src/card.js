@@ -45,12 +45,14 @@ class NoteCard {
     if (g.icons) { this.rows.icons = y; y += 36; }
     this.rows.bar = y; y += 22;
     this.status.setY(y + 4); y += 26;
-    this.rows.chip = y; y += 30;
+    this.rows.chip = y;
+    this.rows.reward = y; // moves down 30 px while a chip shows
     this.seedIcon.setY(y + 8); this.rewardText.setY(y + 8);
     const unlock = note.unlock ? ` · ${UNLOCK_NAME[note.unlock]}` : "";
     this.rewardText.setText(note.reward ? `+${note.reward}${unlock}` : "a party postcard");
     this.seedIcon.setVisible(!!note.reward);
     this.h = y + 26;
+    this.chipOn = false;
     this.drawBox();
     this.buildIcons(g);
     this.buildPeople(note.who);
@@ -103,6 +105,14 @@ class NoteCard {
   }
 
   chip(text, fill) {
+    // the card grows to make room for a chip and shrinks back without one
+    if (!!text !== this.chipOn) {
+      this.chipOn = !!text;
+      const d = this.chipOn ? 30 : 0;
+      this.seedIcon.setY(this.rows.reward + d + 8); this.rewardText.setY(this.rows.reward + d + 8);
+      this.h = this.rows.reward + d + 26;
+      this.drawBox();
+    }
     this.chipText.setText(text);
     const w = Math.min(CARD.w - 24, this.chipText.width + 22), y = this.rows.chip + 12;
     this.chipText.setPosition(CARD.w / 2, y);
@@ -155,7 +165,7 @@ class NoteCard {
     }
     for (let k = 0; k < note.reward; k++) {
       const sd = sc.add.image(CARD.x + 26, CARD.y + this.seedIcon.y, "icon-seed").setScale(0.22).setDepth(55);
-      sc.tweens.add({ targets: sd, x: 1102, y: 56, duration: 700, delay: 300 + k * 110, ease: "Cubic.In", onComplete: () => { sd.destroy(); sc.bumpSeeds?.(); } });
+      sc.tweens.add({ targets: sd, x: SEED_AT.x, y: SEED_AT.y, duration: 700, delay: 300 + k * 110, ease: "Cubic.In", onComplete: () => { sd.destroy(); sc.bumpSeeds?.(); } });
     }
     this.people.each(im => sc.tweens.add({ targets: im, scaleY: im.scaleY * 1.08, scaleX: im.scaleX * 0.94, yoyo: true, repeat: 2, duration: 160 }));
     sc.time.delayedCall(1300, () => {
