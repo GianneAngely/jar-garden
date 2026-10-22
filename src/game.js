@@ -1,6 +1,7 @@
 const DT = 1 / 240;          // sim step (days)
 const DAY_SECONDS = 60;      // real seconds per in-game day at 1x
 const SPEEDS = [1, 2, 4];
+const UPRIGHT = matchMedia("(orientation: portrait) and (max-width: 820px)"); // same query as #rotate in index.html
 const SHOP = ["moss", "springtail", "fern", "mushroom", "snail", "firefly"];
 const SPRITES = ["snail", "snail-sad", "springtail", "firefly", "fern", "mushroom", "moss", "mould", "leaves", "lamp", "cork", "soil", "hedgehog", "owl", "frog", "mole"];
 const ICONS = ["spray", "bulb", "lid", "drop", "seed", "sprout", "air", "heart"];
@@ -103,7 +104,8 @@ class Jar extends Phaser.Scene {
       this.s = Sim.create(seed);
       Req.create(this.s);
     }
-    this.noteSnap = structuredClone(this.s);
+    const snap = saved && Save.load(Save.snapKey); // Continue: Rewind still goes where it did before the reload
+    this.noteSnap = snap?.req?.i === this.s.req.i ? snap : structuredClone(this.s);
     window.jar = this.s;
     this.speedIdx = this.s.req.perks.includes("speed") ? 1 : 0; // a continued jar runs at 2x like after note 1
     this.paused = false;
@@ -177,6 +179,7 @@ class Jar extends Phaser.Scene {
     this.input.keyboard?.on("keydown-SPACE", () => this.speedBtn.visible && !this.modal && this.togglePause());
     this.input.keyboard?.on("keydown-ESC", () => this.select(null));
     window.STATE = "jar";
+    if (this.s.req.won && !this.s.req.winSeen) this.time.delayedCall(800, () => this.showWin()); // closed mid-party: the finale still shows
   }
 
   // Turn a static Graphics into a texture once, in the same place in the display list: WebGL rebuilds every
@@ -399,7 +402,7 @@ class Jar extends Phaser.Scene {
     if (ev.type === "lose") { this.showLose(ev.tip); return; }
     // done: the sim already paid the seeds and set up the next note; snapshot it for Rewind
     // (unless no animal is alive: Rewind must never bring back a jar that is already lost)
-    if (this.s.ents.some(e => Sim.ANIMALS.includes(e.kind))) { this.noteSnap = structuredClone(this.s); Save.write(this.s); }
+    if (this.s.ents.some(e => Sim.ANIMALS.includes(e.kind))) { this.noteSnap = structuredClone(this.s); Save.write(this.s, true); }
     this.thanks.push(ev.note);
     this.pendingSeeds += ev.note.reward; // they fly in during the thank-you
     if (this.thanks.length === 1) this.thank(0);
@@ -615,6 +618,8 @@ class Jar extends Phaser.Scene {
   showWin() {
     Audio.sfx(this, "win", { volume: 0.55 });
     const s = this.s, o = this.openModal();
+    s.req.winSeen = this.noteSnap.req.winSeen = true;
+    Save.write(s);
     const dim = this.add.rectangle(0, 0, W, H, 0x2b2036, 0.5).setOrigin(0).setInteractive();
     const g = this.add.graphics().fillStyle(COL.card).lineStyle(4, COL.inkHex).fillRoundedRect(130, 70, 1020, 580, 26).strokeRoundedRect(130, 70, 1020, 580, 26);
     o.add([dim, g, label(this, W / 2, 124, "Party night!", 40, COL.ink, 0.5), label(this, W / 2, 168, "Your neighbours sent you six postcards.", 20, "#9a7a66", 0.5)]);
@@ -644,7 +649,7 @@ class Jar extends Phaser.Scene {
   update(time, delta) {
     const sp = this.coach.fast || (this.paused ? 0 : SPEEDS[this.speedIdx]);
     this.acc += (delta / 1000) * sp / DAY_SECONDS;
-    if (this.thanks.length || this.modal) this.acc = 0; // the jar holds still during a thank-you or an overlay
+    if (this.thanks.length || this.modal || UPRIGHT.matches) this.acc = 0; // the jar holds still during a thank-you or an overlay
     for (let n = 0; this.acc >= DT && n < 60 && !this.s.req.lost; n++) {
       Sim.tick(this.s, DT);
       Req.gate(this.s, DT);
@@ -789,7 +794,7 @@ class Jar extends Phaser.Scene {
       this.lastPayShown = s.lastPay.day;
       this.payPops(s.lastPay);
       if (s.req.won && s.ents.some(e => Sim.ANIMALS.includes(e.kind))) this.noteSnap = structuredClone(s); // free play: Rewind to this morning
-      if (s.ents.some(e => Sim.ANIMALS.includes(e.kind))) Save.write(s);
+      if (s.ents.some(e => Sim.ANIMALS.includes(e.kind))) Save.write(s, s.req.won); // free play: this morning is the Rewind point
     }
     this.seedText.setText(String(Math.max(0, s.seeds - this.pendingSeeds)));
     const vals = { hum: s.hum, air: s.air, light: Sim.light(s) * 100, mould: (Sim.mouldTotal(s) / Sim.N) * 100 };

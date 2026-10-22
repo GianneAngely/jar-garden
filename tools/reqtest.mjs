@@ -100,6 +100,15 @@ for (const [label, r, late, maxSec] of [["quick 1x", 1, 0, 35], ["slow 2x", 2, 0
   check(s.req.i === 1 && glow != null && glow <= maxSec && sad === 0 && pm.ffHum >= 55,
     `onboarding ${label}: first glow ${glow?.toFixed(1)} s (<= ${maxSec}), firefly placed at hum ${pm.ffHum?.toFixed(1)}, sad while glowing ${sad}`);
 }
+{ // a player who waits a long time at "Lamp off!" (the clock is held, the sim runs on): Dot must survive
+  const s = fresh(5), pl = tutor(1), pm = {};
+  for (let k = 0; k < 3 / DT && !(s.lamp && Sim.isNight(s) && Sim.count(s, "firefly")); k++) { pl(s, pm); Sim.tick(s, DT); Req.gate(s, DT); Req.update(s, DT); }
+  for (let k = 0; k < 2.5 / DT; k++) { Sim.tick(s, DT); Req.gate(s, DT); Req.update(s, DT); } // 150 s of waiting with the lamp on
+  const alive = Sim.count(s, "firefly");
+  Sim.setLamp(s, false);
+  for (let k = 0; k < 1 / DT && s.req.i === 0; k++) { Sim.tick(s, DT); Req.gate(s, DT); Req.update(s, DT); }
+  check(alive === 1 && s.req.i === 1, `note 1 survives a long wait at "Lamp off!" (Dot alive ${alive}, note done ${s.req.i === 1})`);
+}
 check(play(fresh(2), null, 2) == null, "note 1 idle never finishes");
 check(play(fresh(3), (s, pm) => { pm.f ??= Req.place(s, "firefly", 0.5, 0.6); }, 2) == null, "note 1 with the lamp never off never finishes");
 check(!Req.place(fresh(4), "fern", 0.5).ok, "fern is not in the shop at the start");

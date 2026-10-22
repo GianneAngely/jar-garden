@@ -10,7 +10,7 @@ class NoteCard {
   constructor(scene) {
     this.scene = scene;
     this.people = scene.add.container(0, 0).setDepth(29);
-    this.box = scene.add.container(CARD.x, CARD.y).setDepth(30);
+    this.box = scene.add.container(CARD.x, CARD.y).setDepth(30).setAlpha(0); // layout() fades it in
     this.bg = scene.add.graphics();
     this.head = label(scene, 16, 24, "", 21);
     this.count = label(scene, CARD.w - 16, 24, "", 15, MUTED, 1);

@@ -40,7 +40,7 @@ const Audio = {
   },
 
   sfx(scene, key, { rate = 1, volume = 0.5, delay = 0 } = {}) {
-    if (NO_AUDIO || (this.muted && !AUDIO_TEST) || !scene.cache.audio.exists(key)) return;
+    if (NO_AUDIO || (this.muted && !AUDIO_TEST) || scene.sound.gameLostFocus || !scene.cache.audio.exists(key)) return;
     scene.sound.play(key, { rate, volume, delay });
   },
 

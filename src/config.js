@@ -30,7 +30,8 @@ const store = {
 const Save = {
   key: "jar-garden-save-v1",
   on: !QS.has("seed"),
-  load() { try { return JSON.parse(store.get(this.key)); } catch { return null; } },
-  write(s) { if (this.on && s.req?.i > 0) store.set(this.key, JSON.stringify(s)); },
-  clear() { try { localStorage.removeItem(this.key); } catch {} },
+  snapKey: "jar-garden-snap-v1", // the Rewind point (start of the current note, or this free-play morning)
+  load(k = this.key) { try { return JSON.parse(store.get(k)); } catch { return null; } },
+  write(s, isSnap) { if (this.on && s.req?.i > 0) { store.set(this.key, JSON.stringify(s)); if (isSnap) store.set(this.snapKey, JSON.stringify(s)); } },
+  clear() { try { localStorage.removeItem(this.key); localStorage.removeItem(this.snapKey); } catch {} },
 };

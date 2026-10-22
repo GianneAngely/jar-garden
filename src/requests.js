@@ -121,6 +121,7 @@
   // so a slow reader still gets the first glow. Call right after Sim.tick.
   function gate(s, dt) {
     if (current(s)?.id !== "glow") return;
+    for (const e of s.ents) e.hp = Math.max(e.hp, 0.25); // the sim runs on under the held clock: nobody dies in note 1
     const ff = Sim.count(s, "firefly") > 0, f = s.day % 1;
     if ((!ff && f > 0.69) || (ff && s.lamp && f > 0.89)) s.day -= dt; // 0.69/0.89: off the 0.1-day graph sample line
   }

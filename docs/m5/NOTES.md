@@ -24,3 +24,16 @@
   - Jam di panel kelipatan 15 menit.
   - Hasilnya: CPU 4x lebih lambat stabil 60 fps (sebelumnya sering 30); 6x, p50 60 fps.
 - Baris chip kosong di kartu udah nutup. Kartu pos di kolase ending bisa diklik buat diperbesar.
+
+## Code review adversarial (22 Okt)
+- Ada 3 reviewer: siklus state/save/rewind, siklus scene/timer, sama input/edge case.
+- 9 temuan, semuanya berhasil direproduksi di headless, terus semuanya dibenerin:
+  - **Parah:** pemain yang diem lama di "Lamp off!" bikin Dot mati, terus onboarding nyangkut selamanya (jam ditahan, semua tombol kekunci). Sekarang ga ada makhluk yang bisa mati selama onboarding. Udah ada tes regresinya di `reqtest`.
+  - Rewind setelah Continue sekarang balik ke awal catatan (titik Rewind disimpen terpisah), bukan ke tengah malam terakhir.
+  - Halaman yang ditutup pas pesta tetap nampilin "Party night!" pas Continue.
+  - Kartu catatan mulai dalam keadaan tersembunyi, jadi pas Continue toples yang udah menang ga ada ikon biji nyasar.
+  - Tombol "New jar" ga bisa ngapus simpanan pas lagi transisi Continue.
+  - SFX ga numpuk pas tab ga fokus.
+  - Toples berhenti pas kartu "putar HP" nutupin layar.
+  - Musik ga kedownload dua kali.
+- Tes: semuanya lolos (sim, request 38, UI file + http/audio, Firefox + WebKit).

@@ -24,7 +24,7 @@ class Title extends Phaser.Scene {
     const saved = Save.on && Save.load();
     const play = button(this, lx, 362, 210, 58, saved ? "▶  Continue" : "▶  Play", null, () => this.go(!!saved));
     play.list[1].setFontSize(26);
-    if (saved) button(this, lx, 428, 150, 40, "New jar", null, () => { Save.clear(); this.go(false); });
+    if (saved) button(this, lx, 428, 150, 40, "New jar", null, () => { if (this.leaving) return; Save.clear(); this.go(false); });
     this.tweens.add({ targets: play, scale: 1.05, yoyo: true, repeat: -1, duration: 900, ease: "Sine.InOut" });
     label(this, 24, 700, "Made for Game Gauntlet: SIM Jam", 15, "#9a7a66");
     muteButton(this, W - 40, 38);
