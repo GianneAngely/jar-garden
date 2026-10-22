@@ -249,6 +249,7 @@
     s.ents = s.ents.filter(e => e.hp > 0);
     for (const b of born) {
       const e = spawn(s, b.kind, b.x, b.kind === "firefly" ? b.y : undefined);
+      e.baby = true; // the view grows it up over its first day
       if (b.kind === "mushroom") e.x = slotX(slotOf(rand(s)));
       e.food = 0.4;
       s.born++;
