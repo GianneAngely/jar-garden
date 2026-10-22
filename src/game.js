@@ -94,13 +94,17 @@ class Boot extends Phaser.Scene {
 class Jar extends Phaser.Scene {
   constructor() { super("Jar"); }
 
-  create() {
+  create(data) {
     const seed = Number(QS.get("seed")) || (Date.now() % 100000) + 1;
-    this.s = Sim.create(seed);
-    Req.create(this.s);
+    const saved = data?.resume && Save.load();
+    if (saved) this.s = saved;
+    else {
+      this.s = Sim.create(seed);
+      Req.create(this.s);
+    }
     this.noteSnap = structuredClone(this.s);
     window.jar = this.s;
-    this.speedIdx = 0;
+    this.speedIdx = this.s.req.perks.includes("speed") ? 1 : 0; // a continued jar runs at 2x like after note 1
     this.paused = false;
     this.acc = 0;
     this.selected = null;
@@ -155,6 +159,7 @@ class Jar extends Phaser.Scene {
     Audio.loadBeds(this); // in case the title's background load was cut short by a quick Play
     this.card = new NoteCard(this);
     this.coach = new Coach(this);
+    this.showSpeed();
     this.thanks = [];
     this.dim = 0;          // extra night darkness for the first-glow moment (tweened)
     this.nextWisp = 0;
@@ -373,7 +378,7 @@ class Jar extends Phaser.Scene {
     if (ev.type === "lose") { this.showLose(ev.tip); return; }
     // done: the sim already paid the seeds and set up the next note; snapshot it for Rewind
     // (unless no animal is alive: Rewind must never bring back a jar that is already lost)
-    if (this.s.ents.some(e => Sim.ANIMALS.includes(e.kind))) this.noteSnap = structuredClone(this.s);
+    if (this.s.ents.some(e => Sim.ANIMALS.includes(e.kind))) { this.noteSnap = structuredClone(this.s); Save.write(this.s); }
     this.thanks.push(ev.note);
     this.pendingSeeds += ev.note.reward; // they fly in during the thank-you
     if (this.thanks.length === 1) this.thank(0);
@@ -762,6 +767,7 @@ class Jar extends Phaser.Scene {
       this.lastPayShown = s.lastPay.day;
       this.payPops(s.lastPay);
       if (s.req.won && s.ents.some(e => Sim.ANIMALS.includes(e.kind))) this.noteSnap = structuredClone(s); // free play: Rewind to this morning
+      if (s.ents.some(e => Sim.ANIMALS.includes(e.kind))) Save.write(s);
     }
     this.seedText.setText(String(Math.max(0, s.seeds - this.pendingSeeds)));
     const vals = { hum: s.hum, air: s.air, light: Sim.light(s) * 100, mould: (Sim.mouldTotal(s) / Sim.N) * 100 };

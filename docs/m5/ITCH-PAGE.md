@@ -60,7 +60,9 @@ Finish all six for the party and a collage of your postcards, then keep playing 
 - **Mist:** +10 humidity.
 - **Speed** (unlocks after the first note): 1x, 2x, 4x or pause. Space also cycles it.
 - **Inspect:** tap a creature to read its mood. The bubbles above creatures show what they need. The panel shows the bars with their causes (▲ / ▼), the last 15 days, and the next payday.
+- **Jar guide:** the **?** button lists what every species needs, makes and eats, and what each bubble means.
 - **Mute:** the speaker icon (top right).
+- Your jar saves itself after the first note; the title then offers **Continue** (or **New jar**).
 
 A day lasts 60 seconds at 1x; after the first note time runs at 2x. A full playthrough takes about 5–8 minutes.
 

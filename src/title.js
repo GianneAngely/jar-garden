@@ -20,21 +20,24 @@ class Title extends Phaser.Scene {
     const tg = this.add.graphics();
     const tag = label(this, lx, 290, "a tiny living world in a jar", 22, COL.ink, 0.5);
     tg.fillStyle(0xfff8ef, 0.88).fillRoundedRect(lx - tag.width / 2 - 16, 272, tag.width + 32, 36, 18);
-    const play = button(this, lx, 362, 210, 58, "▶  Play", null, () => this.go());
+    // with a saved jar: Continue is the big button, "New jar" starts over
+    const saved = Save.on && Save.load();
+    const play = button(this, lx, 362, 210, 58, saved ? "▶  Continue" : "▶  Play", null, () => this.go(!!saved));
     play.list[1].setFontSize(26);
+    if (saved) button(this, lx, 428, 150, 40, "New jar", null, () => { Save.clear(); this.go(false); });
     this.tweens.add({ targets: play, scale: 1.05, yoyo: true, repeat: -1, duration: 900, ease: "Sine.InOut" });
     label(this, 24, 700, "Made for Game Gauntlet: SIM Jam", 15, "#9a7a66");
     muteButton(this, W - 40, 38);
-    this.input.keyboard?.once("keydown-ENTER", () => this.go());
-    this.input.keyboard?.once("keydown-SPACE", () => this.go());
+    this.input.keyboard?.once("keydown-ENTER", () => this.go(!!saved));
+    this.input.keyboard?.once("keydown-SPACE", () => this.go(!!saved));
     Audio.loadBeds(this, () => this.scene.isActive() && Audio.bed(this, "music", "music-title", 1200));
     window.STATE = "title";
   }
 
-  go() {
+  go(resume) {
     if (this.leaving) return;
     this.leaving = true;
     this.cameras.main.fadeOut(350, 0xf3, 0xe6, 0xd3);
-    this.cameras.main.once("camerafadeoutcomplete", () => this.scene.start("Jar"));
+    this.cameras.main.once("camerafadeoutcomplete", () => this.scene.start("Jar", { resume }));
   }
 }

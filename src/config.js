@@ -24,3 +24,13 @@ const store = {
   get(k) { try { return localStorage.getItem(k); } catch { return null; } },
   set(k, v) { try { localStorage.setItem(k, v); } catch {} },
 };
+
+// One autosaved jar per browser (after the onboarding: at each finished note and each midnight). Test and demo
+// runs with a fixed ?seed never save, so they always start fresh.
+const Save = {
+  key: "jar-garden-save-v1",
+  on: !QS.has("seed"),
+  load() { try { return JSON.parse(store.get(this.key)); } catch { return null; } },
+  write(s) { if (this.on && s.req?.i > 0) store.set(this.key, JSON.stringify(s)); },
+  clear() { try { localStorage.removeItem(this.key); } catch {} },
+};

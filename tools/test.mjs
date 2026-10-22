@@ -128,6 +128,24 @@ await click(640, 415);
 check(await evaluate(`(() => { const sc = game.scene.getScene("Jar"); return jar !== sc.noteSnap && jar.ents.some(e => Sim.ANIMALS.includes(e.kind)) && jar.req.i === sc.noteSnap.req.i && !jar.req.lost; })()`), "Rewind brings the jar back to the note start" + (V ? " " + await evaluate(`(() => { const sc = game.scene.getScene("Jar"); return [jar === sc.noteSnap, jar.ents.length, jar.req.i, sc.noteSnap.req.i, jar.req.lost, sc.children.list.filter(o => o.depth === 70).length].join(","); })()`) : ""));
 
 if (AUDIOTEST) check(await evaluate(`["music-day", "music-night"].includes(Audio.beds.music?.key) && Audio.beds.music.snd.isPlaying && game.sound.mute`), "audio test: music bed follows day/night, muted");
+// autosave: a jar without a fixed seed saves after note 1; the title then offers Continue, which brings it back
+{
+  const base = url.split("?")[0];
+  await cdp.open(base + "?mute&play");
+  await waitFor(`window.STATE === "jar"`);
+  await sleep(400);
+  await evaluate(`(() => { const S = game.scene.getScene("Jar"); Req.place(jar, "firefly", 0.5, 0.6); jar.hum = 70; jar.lamp = false; jar.day = 0.8; S.syncButtons();
+    while (jar.req.i === 0) { Sim.tick(jar, 1/240); Req.gate(jar, 1/240); const ev = Req.update(jar, 1/240); if (ev) S.onNote(ev); } })()`);
+  check(await evaluate(`!!localStorage.getItem(Save.key)`), "autosave written after note 1");
+  await cdp.open(base + "?mute");
+  await waitFor(`window.STATE === "title"`);
+  await sleep(500);
+  check(await evaluate(`game.scene.getScene("Title").children.list.some(o => o.list?.[1]?.text?.includes("Continue"))`), "title offers Continue");
+  await click(381, 362);
+  check(await waitFor(`window.STATE === "jar" && jar.req.i === 1 && game.scene.getScene("Jar").speedBtn.visible`), "Continue brings the saved jar back (note 2, speed on)");
+  await evaluate(`Save.clear()`);
+}
+
 // audio files decode (OfflineAudioContext renders nothing out loud; the page itself stays ?mute)
 if (server) {
   const res = await evaluate(`(async () => { const ctx = new OfflineAudioContext(1, 44100, 44100), out = [];
