@@ -27,7 +27,7 @@ Read a bubble, use a verb (lid, lamp, mist, buy), then watch a bar and a creatur
 - During note 4 the Mould bar zooms to 0-20%.
 
 ## Onboarding (30 s, no long text)
-The jar is staged at 8:38 AM: hum 47, air 30, lamp on, 5 moss tufts. Only the prompted control responds. The clock holds at 4:48 PM until the firefly is in, and at 9:36 PM until the lamp is off, so slow readers still get the glow.
+The jar is staged at 8:38 AM: hum 47, air 30, lamp on, 5 moss tufts. Only the prompted control responds. The clock holds at 4:33 PM until the firefly is in, and at 9:21 PM until the lamp is off, so slow readers still get the glow. The wait for dusk runs as a 4x time-lapse.
 1. "Pip can't breathe! Open the lid." (Air rises, Pip smiles.)
 2. "Close it. Keeps it damp." (Fires at air 45.)
 3. "Mist!" (Humidity 46 to 56.)
@@ -38,7 +38,7 @@ The jar is staged at 8:38 AM: hum 47, air 30, lamp on, 5 moss tufts. Only the pr
 ## Win / lose
 - **Win:** the firefly party, then a postcard of your own jar (median 5.5 in-game days, 5-9 min at 2x). After that, free play.
 - **Lose:** no snail, springtail or firefly alive for 1 day. A "Last animal gone!" banner comes first. Then "The jar went quiet": Rewind to the start of the note, with a tip from the last death ("Snails need fresh air").
-- Doing nothing never loses. Leaving the lid open loses at about 4.4 d.
+- Neglect loses slowly: an idle jar from note 3 on loses around day 11 as mould spreads. Leaving the lid open loses at about 4.4 d. No losing during the onboarding.
 
 ## What a judge sees in 30 s
 Every tap moves a bar and flips a mood bubble. Dusk falls on its own, and lamp-off makes Dot glow. The air and humidity bars name their causes ("▲ plants ▼ snail"). Seeds pop out of the creatures that earned them.
@@ -46,17 +46,18 @@ Every tap moves a bar and flips a mood bubble. Dusk falls on its own, and lamp-o
 ## Seed economy
 - **Payday:** +1 per happy species, max 6 a day (was ~12). A sulking creature shows "no seed".
 - **Seeds:** start with 8. Note rewards 4 / 4 / 6 / 4 / 4.
-- **Income:** passive 2.5 a day, engaged 5.4 (was 4.9 / 9.3).
+- **Income:** paydays give about 2.4 a day passive and 3 engaged; with note rewards about 7 a day (was 4.9 / 9.3 from paydays alone).
 - **Choices:**
   - Lamp for fast moss vs a happy Dot.
   - Buy one firefly now or wait for midnight.
-  - Free lid vs 6 seeds of mushrooms.
+  - Free lid vs mushrooms (the lid is free; mushrooms keep cleaning afterwards).
 - **Shop at start:** Moss, Snail, Firefly. Notes unlock the rest.
 
 ## Sim changes
 1. Payday rule above (`s.lastPay` drives the seed pops).
 2. Fireflies no longer breed (`FIREFLY_BREED = 0`).
-3. `s.flux` cause rates, inert.
+3. `s.flux` cause rates, shown as cause lines under Humidity and Fresh air.
+4. A springtail or mushroom whose only trouble is hunger is "ok", not "sad" (M3d): no verb feeds it, so it must not block a "nobody sad" note. It still loses hp and earns no seed.
 
 ## Art
 - Hazel exists. Mo, Olive and Fen are generated in Flow (A/B/C sheet sent to Angel, temp picks in use).
