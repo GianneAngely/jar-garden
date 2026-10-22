@@ -26,9 +26,13 @@ const Audio = {
     if (NO_AUDIO) return;
     for (const k of SFX) scene.load.audio(k, [`assets/audio/${k}.ogg`, `assets/audio/${k}.mp3`]);
   },
+  // each bed is requested once per page: a quick Play leaves the title's downloads in flight (they still land
+  // in the cache), and asking again would fetch every file twice
+  requested: new Set(),
   loadBeds(scene, done) {
     if (NO_AUDIO) return;
-    const todo = LOOPS.filter(k => !scene.cache.audio.exists(k));
+    const todo = LOOPS.filter(k => !scene.cache.audio.exists(k) && !this.requested.has(k));
+    todo.forEach(k => this.requested.add(k));
     if (!todo.length) return done?.();
     for (const k of todo) scene.load.audio(k, [`assets/audio/${k}.ogg`, `assets/audio/${k}.mp3`]);
     scene.load.once("complete", () => done?.());
