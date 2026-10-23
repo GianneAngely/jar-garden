@@ -3,11 +3,11 @@ class Title extends Phaser.Scene {
   constructor() { super("Title"); }
 
   create() {
-    this.add.image(0, 0, "title").setOrigin(0).setDisplaySize(W, H);
-    // fireflies around the painted jar (the jar fills about x 320-610, y 60-480 of this art)
+    this.add.image(0, 0, "title").setOrigin(0).setScale(PX);
+    // fireflies around the jar in the art (centred about 660, 330)
     for (let k = 0; k < 7; k++) {
       const g = this.add.image(0, 0, "glow").setTint(0xffc94a).setBlendMode(Phaser.BlendModes.ADD).setScale(0.32 + (k % 3) * 0.08);
-      const p = { a: k * 0.9, r: 50 + (k % 4) * 18, sp: 0.00035 + (k % 3) * 0.00012, cx: 450 + (k % 2) * 30, cy: 280 + (k % 3) * 40 };
+      const p = { a: k * 0.9, r: 40 + (k % 4) * 22, sp: 0.00035 + (k % 3) * 0.00012, cx: 645 + (k % 2) * 30, cy: 310 + (k % 3) * 20 };
       this.events.on("update", (t) => {
         g.setPosition(p.cx + Math.cos(t * p.sp + p.a) * p.r, p.cy + Math.sin(t * p.sp * 1.7 + p.a) * p.r * 0.45);
         g.setAlpha(0.55 + 0.45 * Math.sin(t / 300 + k * 2));
@@ -25,8 +25,9 @@ class Title extends Phaser.Scene {
     const play = button(this, lx, 372, 210, 58, saved ? "▶  Continue" : "▶  Play", null, () => this.go(!!saved));
     play.list[1].setFontSize(26);
     if (saved) button(this, lx, 440, 150, 40, "New jar", null, () => { if (this.leaving) return; Save.clear(); this.go(false); });
-    this.tweens.add({ targets: play, scale: 1.05, yoyo: true, repeat: -1, duration: 900, ease: "Sine.InOut" });
-    label(this, 24, 700, "Made for Game Gauntlet: SIM Jam", 15, "#9a7a66");
+    this.time.addEvent({ delay: 700, loop: true, callback: () => (play.y = play.y === 372 ? 368 : 372) }); // a 4 px bob
+    const credit = label(this, 26, 700, "Made for Game Gauntlet: SIM Jam", 16, COL.ink);
+    tg.fillStyle(0xfff8ef, 0.9).fillRoundedRect(16, 686, credit.width + 20, 28, 6);
     muteButton(this, W - 40, 38);
     this.input.keyboard?.once("keydown-ENTER", () => this.go(!!saved));
     this.input.keyboard?.once("keydown-SPACE", () => this.go(!!saved));

@@ -5,8 +5,8 @@ const FX = {
   // soft soil puff where a creature lands
   dust(sc, x, y) {
     for (let k = 0; k < 5; k++) {
-      const d = sc.add.circle(x + (k - 2) * 7, y - 2, 4 + (k % 2) * 2, 0x8a6448, 0.55).setDepth(24);
-      sc.tweens.add({ targets: d, x: d.x + (k - 2) * 9, y: y - 10 - (k % 3) * 5, alpha: 0, scale: 1.6, duration: 420, ease: "Cubic.Out", onComplete: () => d.destroy() });
+      const d = sc.add.rectangle(x + (k - 2) * 8, y - 2, 4 + (k % 2) * 2, 4 + (k % 2) * 2, 0x8a6448, 0.55).setDepth(24);
+      sc.tweens.add({ targets: d, x: d.x + (k - 2) * 9, y: y - 10 - (k % 3) * 5, alpha: 0, duration: 420, ease: "Cubic.Out", onComplete: () => d.destroy() });
     }
   },
 
@@ -14,22 +14,24 @@ const FX = {
   sparkle(sc, x, y, n = 6, tint = 0xffe680, spread = 40) {
     for (let k = 0; k < n; k++) {
       const a = (k / n) * Math.PI * 2 + Math.random() * 0.5, r = spread * (0.5 + Math.random() * 0.6);
-      const g = sc.add.image(x, y, "glow").setScale(0.12 + Math.random() * 0.1).setTint(tint).setBlendMode(Phaser.BlendModes.ADD).setDepth(26);
-      sc.tweens.add({ targets: g, x: x + Math.cos(a) * r, y: y + Math.sin(a) * r - 10, alpha: 0, scale: 0.04, duration: 700 + Math.random() * 400, ease: "Cubic.Out", onComplete: () => g.destroy() });
+      const g = sc.add.image(x, y, "spark").setScale(2 + (k % 2) * 2).setTint(tint).setBlendMode(Phaser.BlendModes.ADD).setDepth(26);
+      sc.tweens.add({ targets: g, x: x + Math.cos(a) * r, y: y + Math.sin(a) * r - 10, alpha: 0, duration: 700 + Math.random() * 400, ease: "Cubic.Out", onComplete: () => g.destroy() });
     }
   },
 
   hearts(sc, x, y, n = 6, depth = 31) {
     for (let k = 0; k < n; k++) {
-      const a = -Math.PI / 2 + (k - (n - 1) / 2) * 0.45, h = sc.add.image(x, y, "icon-heart").setScale(1).setDepth(depth);
-      sc.tweens.add({ targets: h, x: x + Math.cos(a) * 90, y: y + Math.sin(a) * 90, scale: fitPx(sc, "icon-heart", 18), alpha: { from: 1, to: 0 }, duration: 1100, delay: k * 50, ease: "Cubic.Out", onComplete: () => h.destroy() });
+      // small heart, then the full-size art a moment later: a crisp grow without fractional scales
+      const a = -Math.PI / 2 + (k - (n - 1) / 2) * 0.45, h = sc.add.image(x, y, "icon-heart-s").setDepth(depth);
+      sc.time.delayedCall(220 + k * 50, () => h.active && h.setTexture("icon-heart"));
+      sc.tweens.add({ targets: h, x: x + Math.cos(a) * 90, y: y + Math.sin(a) * 90, alpha: { from: 1, to: 0 }, duration: 1100, delay: k * 50, ease: "Cubic.Out", onComplete: () => h.destroy() });
     }
   },
 
   // stale air leaving the open jar: the visible cause of "Fresh air" rising
   airWisp(sc) {
     const x = JAR.x + 90 + Math.random() * (JAR.w - 180);
-    const w = sc.add.image(x, JAR.y + 70, "icon-air").setScale(fitPx(sc, "icon-air", 16)).setAlpha(0).setDepth(24).setTint(0xf4f8f6);
+    const w = sc.add.image(x, JAR.y + 70, "icon-air-s").setAlpha(0).setDepth(24).setTint(0xf4f8f6);
     sc.tweens.add({ targets: w, y: JAR.y - 40 - Math.random() * 40, x: x + (Math.random() - 0.5) * 80, alpha: { from: 0.75, to: 0 }, duration: 1600, ease: "Sine.Out", onComplete: () => w.destroy() });
   },
 
@@ -43,7 +45,7 @@ const FX = {
 
   // a mould spore drifting up from a patch
   spore(sc, x) {
-    const d = sc.add.circle(x + (Math.random() - 0.5) * 16, JAR.soil - 4, 2 + Math.random() * 1.5, 0xb8b4a2, 0.9).setDepth(24);
+    const d = sc.add.rectangle(x + (Math.random() - 0.5) * 16, JAR.soil - 4, 4, 4, 0xb8b4a2, 0.9).setDepth(24);
     sc.tweens.add({ targets: d, y: d.y - 40 - Math.random() * 40, x: d.x + (Math.random() - 0.5) * 20, alpha: 0, duration: 1800, ease: "Sine.Out", onComplete: () => d.destroy() });
   },
 

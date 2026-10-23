@@ -101,5 +101,3 @@ function fitPx(scene, key, box) {
   const s = scene.textures.get(key).getSourceImage();
   return Math.max(1, Math.round(box / Math.max(s.width, s.height)));
 }
-// A scale near `want` (in screen pixels per art pixel), snapped to whole steps.
-const pxStep = want => Math.max(1, Math.round(want));

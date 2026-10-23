@@ -4,6 +4,8 @@ const WHO = { hazel: "hedgehog", mole: "mole", owl: "owl", frog: "frog" };
 const CARD = { x: 12, y: 284, w: 256 }; // below the room's hanging lamp
 const MUTED = "#9a7a66";
 const UNLOCK_NAME = { speed: "Speed button", springtail: "Springtail", mushroom: "Mushroom", fern: "Fern" };
+const PC = { w: 250, pw: 222, ph: 268 }; // postcard and its photo window (the jar photo shows at half size)
+PC.h = PC.ph + 118;
 
 class NoteCard {
   constructor(scene) {
@@ -21,7 +23,7 @@ class NoteCard {
     this.status = label(scene, 16, 0, "", 15);
     this.chipBg = scene.add.graphics();
     this.chipText = label(scene, 0, 0, "", 14, COL.ink, 0.5);
-    this.seedIcon = scene.add.image(26, 0, "icon-seed").setScale(fitPx(scene, "icon-seed", 20));
+    this.seedIcon = scene.add.image(24, 0, "icon-seed-s");
     this.rewardText = label(scene, 42, 0, "", 15);
     this.box.add([this.bg, this.head, this.count, this.ask, this.line, this.viz, this.icons, this.status, this.chipBg, this.chipText, this.seedIcon, this.rewardText]);
     this.noteId = null;
@@ -79,9 +81,9 @@ class NoteCard {
       this.pipImgs.push({ im, glow });
     }
     if (g.icons) g.icons.forEach((k, i) => {
-      const tex = this.scene.textures.get(k.key).getSourceImage();
-      const im = this.scene.add.image(30 + i * 38, this.rows.icons + 16, k.key).setScale(Math.max(1, Math.floor(30 / Math.max(tex.width, tex.height))));
-      const sad = this.scene.add.circle(im.x + 12, im.y - 11, 5, 0xc8553d).setStrokeStyle(2, COL.inkHex);
+      const key = this.scene.textures.exists(k.key + "-s") ? k.key + "-s" : k.key;
+      const im = this.scene.add.image(30 + i * 38, this.rows.icons + 16, key);
+      const sad = this.scene.add.rectangle(im.x + 12, im.y - 12, 8, 8, 0xc8553d).setStrokeStyle(2, COL.inkHex);
       this.icons.add([im, sad]);
       this.kindImgs.push({ im, sad });
     });
@@ -91,16 +93,19 @@ class NoteCard {
     this.people.removeAll(true);
     const keys = who === "all" ? ["hedgehog", "mole", "owl", "frog"] : [WHO[who]];
     keys.forEach((k, i) => {
-      const x = who === "all" ? 44 + i * 58 : 124;
+      const x = who === "all" ? 34 + i * 52 : 124;
       // one scale for all four (2x alone, 1x in the party lineup), so they keep the lineup art's sizes
       const im = this.scene.add.image(x, 724, k).setOrigin(0.5, 1).setScale(who === "all" ? 1 : 2);
       this.people.add(im);
-      im.y += im.displayHeight + 20;
-      this.scene.tweens.add({ targets: im, y: 724, duration: 520, delay: 120 + i * 90, ease: "Back.Out" });
+      im.y = this.restY(im) + im.displayHeight + 20;
+      this.scene.tweens.add({ targets: im, y: this.restY(im), duration: 520, delay: 120 + i * 90, ease: "Back.Out" });
     });
-    this.box.setScale(0.85).setAlpha(0);
-    this.scene.tweens.add({ targets: this.box, scale: 1, alpha: 1, duration: 360, delay: 260, ease: "Back.Out" });
+    this.box.setAlpha(0).setY(CARD.y + 8);
+    this.scene.tweens.add({ targets: this.box, y: CARD.y, alpha: 1, duration: 300, delay: 260, ease: "Cubic.Out" });
   }
+
+  // where a neighbour stands: on the bottom edge, or lower when they are tall enough to reach the card's tail
+  restY(im) { return Math.max(724, CARD.y + this.h + 26 + im.displayHeight); }
 
   chip(text, fill) {
     // the card grows to make room for a chip and shrinks back without one
@@ -110,6 +115,7 @@ class NoteCard {
       this.seedIcon.setY(this.rows.reward + d + 8); this.rewardText.setY(this.rows.reward + d + 8);
       this.h = this.rows.reward + d + 26;
       this.drawBox();
+      if (!this.busy) this.people.each(im => this.scene.tweens.add({ targets: im, y: this.restY(im), duration: 240, ease: "Cubic.Out" }));
     }
     this.chipText.setText(text);
     const w = Math.min(CARD.w - 24, this.chipText.width + 22), y = this.rows.chip + 12;
@@ -158,21 +164,21 @@ class NoteCard {
     this.chip("Thank you!", 0xcfe8c0);
     this.viz.fillStyle(0x9fd08a).fillRoundedRect(16, this.rows.bar, CARD.w - 32, 16, 8).lineStyle(2, COL.inkHex).strokeRoundedRect(16, this.rows.bar, CARD.w - 32, 16, 8);
     for (let k = 0; k < 8; k++) {
-      const a = (k / 8) * Math.PI * 2, h = sc.add.image(CARD.x + CARD.w / 2, CARD.y + this.h / 2, "icon-heart").setScale(fitPx(sc, "icon-heart", 18)).setDepth(31);
-      sc.tweens.add({ targets: h, x: h.x + Math.cos(a) * 150, y: h.y + Math.sin(a) * 120, scale: 0.08, alpha: 0, duration: 900, ease: "Cubic.Out", onComplete: () => h.destroy() });
+      const a = (k / 8) * Math.PI * 2, h = sc.add.image(CARD.x + CARD.w / 2, CARD.y + this.h / 2, "icon-heart-s").setDepth(31);
+      sc.tweens.add({ targets: h, x: h.x + Math.cos(a) * 150, y: h.y + Math.sin(a) * 120, alpha: 0, duration: 900, ease: "Cubic.Out", onComplete: () => h.destroy() });
     }
     for (let k = 0; k < note.reward; k++) {
       const sd = sc.add.image(CARD.x + 26, CARD.y + this.seedIcon.y, "icon-seed").setScale(fitPx(sc, "icon-seed", 22)).setDepth(55);
       sc.tweens.add({ targets: sd, x: SEED_AT.x, y: SEED_AT.y, duration: 700, delay: 300 + k * 110, ease: "Cubic.In", onComplete: () => { sd.destroy(); sc.bumpSeeds?.(); } });
     }
-    this.people.each(im => sc.tweens.add({ targets: im, scaleY: im.scaleY * 1.08, scaleX: im.scaleX * 0.94, yoyo: true, repeat: 2, duration: 160 }));
+    this.people.each(im => sc.tweens.add({ targets: im, y: im.y - 8, yoyo: true, repeat: 2, duration: 160 })); // a happy hop
     sc.time.delayedCall(1300, () => {
-      sc.tweens.add({ targets: this.box, alpha: 0, scale: 0.9, duration: 260 });
-      const pc = postcard(sc, note, day, photo).setPosition(140, 300).setDepth(31).setAngle(-14).setScale(0.6).setAlpha(0);
-      sc.tweens.add({ targets: pc, angle: -4, scale: 1, alpha: 1, duration: 520, ease: "Back.Out" });
+      sc.tweens.add({ targets: this.box, alpha: 0, duration: 260 });
+      const pc = postcard(sc, note, day, photo).setPosition(140, 330).setDepth(31).setAlpha(0);
+      sc.tweens.add({ targets: pc, y: 300, alpha: 1, duration: 420, ease: "Back.Out" });
       Audio.sfx(sc, "postcard", { volume: 0.5 });
       sc.time.delayedCall(3400, () => {
-        sc.tweens.add({ targets: pc, x: -200, angle: -20, duration: 450, ease: "Back.In", onComplete: () => pc.destroy() });
+        sc.tweens.add({ targets: pc, x: -200, duration: 450, ease: "Back.In", onComplete: () => pc.destroy() });
         this.people.each(im => sc.tweens.add({ targets: im, y: 724 + im.displayHeight + 20, duration: 380, ease: "Back.In" }));
         sc.time.delayedCall(480, () => { this.busy = false; this.noteId = null; then?.(); });
       });
@@ -185,39 +191,36 @@ class NoteCard {
 const STAMP = { hazel: "hedgehog", mole: "mole", owl: "owl", frog: "frog", all: "firefly" };
 function postcard(scene, note, day, photo) {
   const c = scene.add.container(0, 0);
-  const w = 250, h = 318, px = -w / 2 + 14, py = -h / 2 + 14, pw = w - 28, ph = 200;
+  const { w, h, pw, ph } = PC, px = -w / 2 + 14, py = -h / 2 + 14;
   const g = scene.add.graphics();
   g.fillStyle(COL.inkHex, 0.22).fillRoundedRect(-w / 2 + 5, -h / 2 + 7, w, h, 10);
   g.fillStyle(0xfffaf1).lineStyle(3, COL.inkHex).fillRoundedRect(-w / 2, -h / 2, w, h, 10).strokeRoundedRect(-w / 2, -h / 2, w, h, 10);
   g.fillStyle(0xdfeee9).fillRect(px, py, pw, ph);
   c.add(g);
   if (photo && scene.textures.exists(photo)) {
-    const im = scene.add.image(px + pw / 2, py + ph / 2, photo);
-    const k = Math.max(pw / im.width, ph / im.height);
-    im.setScale(k).setCrop((im.width - pw / k) / 2, (im.height - ph / k) / 2, pw / k, ph / k);
-    c.add(im);
+    c.add(scene.add.image(px + pw / 2, py + ph / 2, photo).setScale(0.5));
   } else {
     const im = scene.add.image(px + pw / 2, py + ph, STAMP[note.who] === "firefly" ? "hedgehog" : STAMP[note.who]).setOrigin(0.5, 1);
-    im.setScale((ph - 12) / im.height);
+    im.setScale(Math.max(1, Math.floor((ph - 12) / im.height)));
     c.add(im);
   }
   const frame = scene.add.graphics().lineStyle(2, COL.inkHex, 0.7).strokeRect(px, py, pw, ph);
   const msg = scene.add.text(-w / 2 + 16, py + ph + 10, note.thanks, { fontFamily: FONT, fontSize: "15px", color: COL.ink, wordWrap: { width: w - 32 }, lineSpacing: 1 });
   const sig = label(scene, w / 2 - 16, h / 2 - 18, "~ " + note.name, 17, COL.ink, 1);
   // stamp: scalloped paper edge around the neighbour's face
-  const sx = w / 2 - 36, sy = -h / 2 + 34, st = scene.add.graphics();
+  const sx = w / 2 - 40, sy = -h / 2 + 42, st = scene.add.graphics();
   st.fillStyle(0xfffaf1);
-  for (let i = 0; i <= 6; i++) for (const [x, y] of [[-24 + i * 8, -28], [-24 + i * 8, 28], [-24, -28 + i * 9.33], [24, -28 + i * 9.33]]) st.fillCircle(sx + x, sy + y, 4.5);
-  st.fillRect(sx - 24, sy - 28, 48, 56).fillStyle(0xf3d9cf).fillRect(sx - 19, sy - 23, 38, 46);
-  st.lineStyle(1.5, COL.inkHex, 0.6).strokeRect(sx - 19, sy - 23, 38, 46);
-  const key = STAMP[note.who], tw = scene.textures.get(key).getSourceImage().width;
-  const face = scene.add.image(0, 0, key).setOrigin(0);
-  const cw = tw * (key === "firefly" ? 1 : 0.62), k = 36 / cw, cx = (tw - cw) / 2, cy = key === "firefly" ? 0 : tw * 0.02;
-  face.setScale(k).setCrop(cx, cy, cw, cw * 44 / 36).setPosition(sx - 18 - cx * k, sy - 22 - cy * k);
+  for (let i = 0; i <= 7; i++) for (const [x, y] of [[-28 + i * 8, -32], [-28 + i * 8, 32], [-28, -32 + i * 9.14], [28, -32 + i * 9.14]]) st.fillCircle(sx + x, sy + y, 4);
+  st.fillRect(sx - 28, sy - 32, 56, 64).fillStyle(0xf3d9cf).fillRect(sx - 22, sy - 26, 44, 52);
+  st.lineStyle(2, COL.inkHex, 0.6).strokeRect(sx - 22, sy - 26, 44, 52);
+  // the face at 1x: a 44x52 window from the top middle of the portrait (the firefly fits whole)
+  const key = STAMP[note.who], src = scene.textures.get(key).getSourceImage();
+  const cw = Math.min(44, src.width), ch = Math.min(52, src.height), cx = Math.floor((src.width - cw) / 2), cy = key === "firefly" ? 0 : 2;
+  const face = scene.add.image(sx - Math.floor(cw / 2) - cx, sy - Math.floor(ch / 2) - cy, key).setOrigin(0).setCrop(cx, cy, cw, ch);
   // postmark rings with the day
-  const mx = px + 30, my = py + ph - 28;
-  const pm = scene.add.graphics().fillStyle(0xfffaf1, 0.92).fillCircle(mx, my, 23).lineStyle(2, COL.inkHex, 0.5).strokeCircle(mx, my, 22).strokeCircle(mx, my, 16);
-  const pmt = label(scene, mx, my, `DAY ${day}`, 11, "#7a5a44", 0.5).setAngle(-12);
+  const mx = px + 38, my = py + ph - 36;
+  const pm = scene.add.graphics().fillStyle(0xfffaf1, 0.92).fillCircle(mx, my, 32).lineStyle(2, COL.inkHex, 0.5).strokeCircle(mx, my, 30).strokeCircle(mx, my, 22);
+  const pmt = label(scene, mx, my, `DAY ${day}`, 16, "#7a5a44", 0.5);
   c.add([frame, msg, sig, st, face, pm, pmt]);
   return c;
 }

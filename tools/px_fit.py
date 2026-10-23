@@ -4,6 +4,8 @@ In the jar every art pixel is 2 screen pixels (the room around it is 4). The soi
 twice as detailed as a 20-slot floor needs, and the soil strip is taller than the jar's soil band, so:
 - moss, leaves, mould: halved (2x2 blocks -> the block's most common opaque colour), alpha kept binary
 - soil: top 16 rows of earth + bottom 27 rows of pebbles = 43 rows, which is the 86 px soil band at 2x
+Also: half-size "-s" icons and creature minis, lamp-off and firefly-day colour variants, rooms padded to 320x180,
+and assets/px/manifest.json refreshed. Run on a fresh make_pixel.py output (halving is not idempotent).
 
 python3 tools/px_fit.py
 """
@@ -38,7 +40,55 @@ def soil_band():
     print(f"soil.png {band.shape[1]}x{band.shape[0]}")
 
 
+def halve_to(name, out):
+    """Half-size copy (same block-majority rule as halve) saved under another key."""
+    src = PX / f"{name}.png"
+    tmp = PX / f"{out}.png"
+    Image.open(src).save(tmp)
+    halve(out)
+
+
+def recolor(name, out, test, to):
+    """Copy a sprite, repainting the pixels that pass test(r, g, b) with colour `to` (e.g. a switched-off bulb)."""
+    a = np.asarray(Image.open(PX / f"{name}.png").convert("RGBA")).copy()
+    r, g, b = a[..., 0].astype(int), a[..., 1].astype(int), a[..., 2].astype(int)
+    m = test(r, g, b) & (a[..., 3] > 0)
+    a[m, :3] = to
+    Image.fromarray(a, "RGBA").save(PX / f"{out}.png")
+    print(f"{out}.png ({int(m.sum())} px repainted)")
+
+
+def full_height(name, rows=180):
+    """Rooms are 320x179; repeat the last row so they cover 720 px at exactly 4x."""
+    im = Image.open(PX / f"{name}.png").convert("RGB")
+    if im.height >= rows:
+        return
+    out = Image.new("RGB", (im.width, rows))
+    out.paste(im, (0, 0))
+    out.paste(im.crop((0, im.height - 1, im.width, im.height)).resize((im.width, rows - im.height), Image.NEAREST), (0, im.height))
+    out.save(PX / f"{name}.png")
+    print(f"{name}.png {im.width}x{rows}")
+
+
+def manifest():
+    import json
+    m = {p.stem: {"w": Image.open(p).width, "h": Image.open(p).height} for p in sorted(PX.glob("*.png"))}
+    (PX / "manifest.json").write_text(json.dumps(m, indent=1))
+
+
 if __name__ == "__main__":
     for n in ["moss", "leaves", "mould"]:
         halve(n)
     soil_band()
+    # mini versions: bubble and button icons, the card's species row
+    for n in ["spray", "bulb", "lid", "drop", "seed", "sprout", "air", "heart"]:
+        halve_to(f"icon-{n}", f"icon-{n}-s")
+    for n in ["snail", "springtail", "fern", "mushroom", "firefly"]:
+        halve_to(n, f"{n}-s")
+    # a switched-off lamp (grey bulb) and a firefly that is not glowing (pale tail, for daytime)
+    yellow = lambda r, g, b: (r > 200) & (g > 170) & (b < 150)
+    recolor("lamp", "lamp-off", yellow, (196, 186, 166))
+    recolor("firefly", "firefly-day", yellow, (232, 220, 168))
+    for n in ["bg-day", "bg-night", "title"]:
+        full_height(n)
+    manifest()

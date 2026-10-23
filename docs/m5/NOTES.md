@@ -37,3 +37,35 @@
   - Toples berhenti pas kartu "putar HP" nutupin layar.
   - Musik ga kedownload dua kali.
 - Tes: semuanya lolos (sim, request 38, UI file + http/audio, Firefox + WebKit).
+
+## QA visual gaya pixel (23 Okt)
+- Agen QA ngecek build pixel art dari layar ke layar dan nemu 26 hal. Semua P1 dan P2 udah dibenerin, P3 cuma yang murah.
+- **Prinsipnya:** tiap piksel art harus tampil seukuran. Jadi ga ada lagi skala pecahan, rotasi, atau zoom kamera. Gerakan diganti geser, ganti frame, atau warna.
+- **Aset baru** (dibikin pakai `tools/px_fit.py`, tanpa Flow):
+  - ikon setengah ukuran (`-s`)
+  - makhluk mini buat bayi, pakis muda, dan baris kartu
+  - lampu mati dengan bohlam abu
+  - kunang-kunang siang yang ga nyala
+  - ruangan 320x180, jadi strip 4 px di bawah layar ilang
+- **Di toples:**
+  - Gelembung kebutuhan (r18, ikon mini) sekarang punya layer sendiri di atas kaca dan cahaya.
+  - Pakis sama jamur pindah ke belakang hewan.
+  - Kunang-kunang siang duduk di belakang siput.
+  - Lumut, jamur, dan daun tumbuh ke atas: barisnya kebuka satu-satu, tanpa diskala.
+  - Bayi sama pakis muda pakai sprite mini. Makhluk yang sedih jadi abu kebiruan, ga miring lagi.
+  - Tutup gabus geser tanpa miring. Momen nyala ga pakai zoom kamera.
+  - Kaca ikut gelap pas malam. Ada bayangan di bawah toples.
+- **Kartu pos:**
+  - Fotonya sekarang seluruh toples plus gabus, pas setengah ukuran.
+  - Kartu ga miring lagi. Di kolase ukurannya 0.5, kalau diklik jadi 1.
+  - Prangko pakai wajah 1x. Cap pos bulat dengan teks lurus.
+- **UI:**
+  - Ikon tombol dan kartu pakai versi mini.
+  - Tetangga yang tinggi berdiri lebih rendah, jadi kepalanya ga ketutup kartu. Lineup pesta geser biar katak ga kepotong tombol.
+  - Legenda panduan diatur sesuai lebar teks.
+  - Credit di judul kebaca. Kunang-kunang judul pindah ke toples.
+  - Tombol Play goyang 4 px, bukan skala.
+  - Cahaya sama percikan sekarang bertingkat per 4 px kayak cahaya pixel art.
+  - Kanvas yang tampil lebih kecil dari 1280x720 piksel perangkat pakai smoothing, biar baris piksel ga ilang.
+- **Belum:** teks lebih gede di HP, segitiga panah coach, ekor kartu, lampu kode vs lampu ruangan.
+- **Tes:** sim, request 38, UI, sama Firefox + WebKit semuanya lolos. Cover, 5 screenshot, dan trailer direkam ulang.

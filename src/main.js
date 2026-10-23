@@ -25,4 +25,8 @@ const game = new Phaser.Game({
   scene: [Boot, Title, Jar],
 });
 document.addEventListener("contextmenu", e => e.preventDefault());
+// shown smaller than 1280x720 device pixels, nearest-neighbour drops whole rows of pixels: smooth it there instead
+const crisp = () => { game.canvas.style.imageRendering = game.canvas.getBoundingClientRect().width * devicePixelRatio < W ? "auto" : "pixelated"; };
+game.events.once("ready", () => { crisp(); game.scale.on("resize", crisp); });
+addEventListener("resize", () => setTimeout(crisp, 50));
 window.game = game;
