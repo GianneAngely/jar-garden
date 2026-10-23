@@ -1,7 +1,7 @@
 # Jar Garden: tes gaya art (A/B/C/D)
 
 Permintaan Angel (23 Okt): pilihan art harus beda **gaya**, bukan variasi karakter. Gaya yang dia pilih buat dicoba: Pixel art cozy, Gouache flat, Clay/miniatur 3D. Gaya sekarang ikut sebagai pembanding.
-Status: **nunggu Chrome bebas dari AllRTS.** Generate-nya lewat Flow `/u/2`, device 038cead3, dan cuma kalau manager bilang Chrome bebas.
+Status: **lembar udah jadi (23 Okt), nunggu Angel milih.** Lembar: `docs/art-style/style-ABCD.jpg`. Hasil mentah Flow ada di `art/flow/style-test/`.
 
 ## Adegannya sama di semua gaya
 Biar perbandingannya adil, tiap gaya gambar adegan yang persis sama, 16:9:
