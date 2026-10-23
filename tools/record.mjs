@@ -66,7 +66,7 @@ try {
     document.body.appendChild(c);
     window.__cur = { el: c, gx: 640, gy: 400 };
     const cap = document.createElement("div");
-    cap.style.cssText = "position:fixed;z-index:9;left:50%;bottom:34px;transform:translateX(-50%);font:600 30px Fredoka,sans-serif;color:#6b4a3a;background:rgba(255,248,239,.92);border:3px solid #6b4a3a;border-radius:26px;padding:8px 26px;opacity:0;transition:none;white-space:nowrap";
+    cap.style.cssText = "position:fixed;z-index:9;left:50%;bottom:34px;transform:translateX(-50%);font:32px Tiny5,monospace;color:#6b4a3a;background:rgba(255,248,239,.92);border:4px solid #6b4a3a;border-radius:0;box-shadow:0 0 0 4px #fff8ef inset;padding:8px 26px;opacity:0;transition:none;white-space:nowrap";
     document.body.appendChild(cap);
     window.__caption = text => { cap.textContent = text; cap.style.opacity = text ? 1 : 0; };
     window.__moveCur = (gx, gy, down) => {
