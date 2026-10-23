@@ -22,12 +22,17 @@ class Coach {
     this.ui = sc.add.container(0, 0).setDepth(45).setAlpha(0);
     this.glow = sc.barGlow; // drawn under the panel bars
     this.pillBg = sc.add.graphics();
-    this.pillText = label(sc, 0, 0, "", 19, COL.ink, 0.5);
+    this.pillText = label(sc, 0, 0, "", readPx(19), COL.ink, 0.5);
     this.arrow = sc.add.graphics();
     this.ui.add([this.pillBg, this.pillText, this.arrow]);
-    // chunky down arrow, drawn once around (0, 0) = its tip
-    this.arrow.fillStyle(0xffe6a8).lineStyle(3, COL.inkHex)
-      .beginPath().moveTo(0, 0).lineTo(-18, -20).lineTo(-8, -20).lineTo(-8, -40).lineTo(8, -40).lineTo(8, -20).lineTo(18, -20).closePath().fillPath().strokePath();
+    // chunky down arrow, drawn once around (0, 0) = its tip, in 2 px steps like the pixel art: ink, then the fill
+    const head = (tip, len, hw0) => {
+      for (let y = 0; y < len; y += 2) this.arrow.fillRect(-Math.max(2, Math.round(hw0 * (len - y) / len / 2) * 2), tip - len + y, 2 * Math.max(2, Math.round(hw0 * (len - y) / len / 2) * 2), 2);
+    };
+    this.arrow.fillStyle(COL.inkHex).fillRect(-12, -44, 24, 26);
+    head(4, 28, 24);
+    this.arrow.fillStyle(0xffe6a8).fillRect(-8, -40, 16, 22);
+    head(0, 20, 18);
     if (this.active) sc.tweens.add({ targets: this.ui, alpha: 1, delay: 500, duration: 400 });
   }
 
@@ -97,9 +102,9 @@ class Coach {
 
   say(text) {
     this.pillText.setText(text);
-    const w = (this.pillW = this.pillText.width + 34);
-    this.pillBg.clear().fillStyle(COL.inkHex, 0.2).fillRoundedRect(-w / 2, -19, w, 42, 21)
-      .fillStyle(0xfffdf8).lineStyle(3, COL.inkHex).fillRoundedRect(-w / 2, -21, w, 42, 21).strokeRoundedRect(-w / 2, -21, w, 42, 21);
+    const w = (this.pillW = this.pillText.width + 34), h = Math.max(42, this.pillText.height + 14);
+    this.pillBg.clear().fillStyle(COL.inkHex, 0.2).fillRoundedRect(-w / 2, -h / 2 + 2, w, h, 21)
+      .fillStyle(0xfffdf8).lineStyle(3, COL.inkHex).fillRoundedRect(-w / 2, -h / 2, w, h, 21).strokeRoundedRect(-w / 2, -h / 2, w, h, 21);
     this.pillText.setScale(0.8);
     this.scene.tweens.add({ targets: this.pillText, scale: 1, duration: 260, ease: "Back.Out" });
   }

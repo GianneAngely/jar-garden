@@ -3,7 +3,7 @@ const DAY_SECONDS = 60;      // real seconds per in-game day at 1x
 const SPEEDS = [1, 2, 4];
 const UPRIGHT = matchMedia("(orientation: portrait) and (max-width: 820px)"); // same query as #rotate in index.html
 const SHOP = ["moss", "springtail", "fern", "mushroom", "snail", "firefly"];
-const SPRITES = ["snail", "snail-sad", "springtail", "firefly", "firefly-day", "fern", "mushroom", "moss", "mould", "leaves", "lamp", "lamp-off", "cork", "soil", "hedgehog", "owl", "frog", "mole",
+const SPRITES = ["snail", "snail-sad", "springtail", "firefly", "firefly-day", "fern", "mushroom", "moss", "mould", "leaves", "bulb-on", "bulb-off", "cork", "soil", "hedgehog", "owl", "frog", "mole",
   "snail-s", "springtail-s", "fern-s", "mushroom-s", "firefly-s"]; // "-s": half-size art (babies, young ferns, card rows)
 const ICONS = ["spray", "bulb", "lid", "drop", "seed", "sprout", "air", "heart"];
 
@@ -35,6 +35,10 @@ const rise = (img, f) => {
   return img;
 };
 const hash = (a, b) => { const x = Math.sin(a * 127.1 + b * 311.7) * 43758.5453; return x - Math.floor(x); };
+
+// phones show the 1280x720 canvas at about half size: there the prompts you must read (coach, toasts, tips, the
+// note's ask) go up one font step, 16 -> 24 px
+const readPx = size => (game.canvas.getBoundingClientRect().width < 0.7 * W ? 24 : size);
 
 function label(scene, x, y, str, size = 22, color = COL.ink, origin = 0) {
   return scene.add.text(x, y, str, { fontFamily: FONT, fontSize: size + "px", color }).setOrigin(origin, 0.5);
@@ -93,12 +97,14 @@ class Boot extends Phaser.Scene {
   }
   create() {
     Audio.apply(this.game);
-    // radial glow for fireflies and the lamp, banded in 4 px cells like pixel-art light (Canvas and WebGL)
-    const t = this.textures.createCanvas("glow", 128, 128), ctx = t.getContext();
-    for (let y = 0; y < 32; y++) for (let x = 0; x < 32; x++) {
-      const d = Math.hypot(x - 15.5, y - 15.5) / 16, a = d >= 1 ? 0 : d < 0.35 ? 1 - d * 1.57 : 0.45 * (1 - d) / 0.65;
-      ctx.fillStyle = `rgba(255,255,255,${Math.ceil(a * 5) / 5})`; ctx.fillRect(x * 4, y * 4, 4, 4);
+    // radial glow for fireflies and the lamp, in five flat bands like pixel-art light (Canvas and WebGL); bands per
+    // texture pixel, so a glow scaled 6x has 6 px steps on its rings, not 24 px blocks
+    const t = this.textures.createCanvas("glow", 128, 128), ctx = t.getContext(), px = ctx.createImageData(128, 128);
+    for (let y = 0; y < 128; y++) for (let x = 0; x < 128; x++) {
+      const d = Math.hypot(x - 63.5, y - 63.5) / 64, a = d >= 1 ? 0 : d < 0.35 ? 1 - d * 1.57 : 0.45 * (1 - d) / 0.65;
+      px.data.set([255, 255, 255, Math.ceil(a * 5) / 5 * 255], (y * 128 + x) * 4);
     }
+    ctx.putImageData(px, 0, 0);
     t.refresh();
     // a tiny plus-shaped spark (sparkles)
     const sp = this.textures.createCanvas("spark", 5, 5), sc = sp.getContext();
@@ -148,9 +154,9 @@ class Jar extends Phaser.Scene {
     this.plants = this.add.layer(); // ferns and mushrooms stand behind the animals
     this.ents = this.add.layer();
     this.night = this.add.rectangle(0, 0, W, H, COL.night, 0).setOrigin(0);
-    // the lamp hangs where the room art has its own lamp (covering it), so the room's lamp is the one you switch
-    this.lamp = this.add.image(112, 52, "lamp").setOrigin(0.5, 0).setScale(PX);
-    this.lampGlow = this.add.image(this.lamp.x, 270, "glow").setScale(6).setTint(0xffd27a).setBlendMode(Phaser.BlendModes.ADD).setAlpha(0);
+    // the switchable lamp is the room art's own lamp: only its bulb is drawn over it, lit or dark
+    this.lamp = this.add.image(88, 220, "bulb-on").setOrigin(0).setScale(PX);
+    this.lampGlow = this.add.image(112, 270, "glow").setScale(6).setTint(0xffd27a).setBlendMode(Phaser.BlendModes.ADD).setAlpha(0);
     this.glows = this.add.layer();
     this.jarFront = this.add.graphics();
     this.drawJarFront();
@@ -174,11 +180,11 @@ class Jar extends Phaser.Scene {
     this.buildPanel();
     this.toast = this.add.container(JAR.x + JAR.w / 2, 240).setDepth(50).setAlpha(0);
     this.toastBg = this.add.graphics();
-    this.toastText = label(this, 0, 0, "", 19, COL.ink, 0.5);
+    this.toastText = label(this, 0, 0, "", readPx(19), COL.ink, 0.5);
     this.toast.add([this.toastBg, this.toastText]);
     this.tip = this.add.container(0, 0).setDepth(60).setVisible(false);
     this.tipBg = this.add.graphics();
-    this.tipText = label(this, 0, 0, "", 18, COL.ink, 0.5);
+    this.tipText = label(this, 0, 0, "", readPx(18), COL.ink, 0.5);
     this.tip.add([this.tipBg, this.tipText]);
 
     Audio.loadBeds(this); // in case the title's background load was cut short by a quick Play
@@ -404,7 +410,8 @@ class Jar extends Phaser.Scene {
     const str = e.why ? `${name}: ${e.why}` : `${name}: ${e.mood === "happy" ? "happy!" : "doing okay"}`;
     this.tipText.setText(str);
     const w = this.tipText.width + 24;
-    this.tipBg.clear().fillStyle(0xfffdf8).lineStyle(2, COL.inkHex).fillRoundedRect(-w / 2, -16, w, 32, 10).strokeRoundedRect(-w / 2, -16, w, 32, 10);
+    const th = this.tipText.height + 12;
+    this.tipBg.clear().fillStyle(0xfffdf8).lineStyle(2, COL.inkHex).fillRoundedRect(-w / 2, -th / 2, w, th, 10).strokeRoundedRect(-w / 2, -th / 2, w, th, 10);
     const v = this.views.get(e.id), top = v ? v.img.displayHeight * LOOK[e.kind].oy : 40;
     this.tip.setPosition(Math.round(Phaser.Math.Clamp(x, w / 2 + 8, W - w / 2 - 8) / 2) * 2, Math.round(Math.max(24, y - top - 60) / 2) * 2).setVisible(true);
     if (this.tipFor !== e.id) this.tipUntil = this.time.now + 3000;
@@ -674,7 +681,7 @@ class Jar extends Phaser.Scene {
     this.night.setFillStyle(COL.night, Math.min(0.8, dusk * (s.lamp ? 0.38 : 0.5) + this.dim));
     const shade = Phaser.Display.Color.Interpolate.ColorWithColor({ r: 255, g: 255, b: 255 }, { r: 140, g: 150, b: 190 }, 1, s.lamp ? dusk * 0.5 : dusk);
     const tint = Phaser.Display.Color.GetColor(shade.r, shade.g, shade.b);
-    const lampKey = s.lamp ? "lamp" : "lamp-off";
+    const lampKey = s.lamp ? "bulb-on" : "bulb-off";
     if (this.lamp.texture.key !== lampKey) this.lamp.setTexture(lampKey);
     this.lid.setTint(tint); this.lamp.setTint(tint); this.jarFront.setTint(tint); this.card.people.each(im => im.setTint(tint));
     this.haze.setAlpha(Phaser.Math.Clamp((45 - s.air) / 45, 0, 1) * 0.45);

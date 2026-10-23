@@ -4,7 +4,8 @@ In the jar every art pixel is 2 screen pixels (the room around it is 4). The soi
 twice as detailed as a 20-slot floor needs, and the soil strip is taller than the jar's soil band, so:
 - moss, leaves, mould: halved (2x2 blocks -> the block's most common opaque colour), alpha kept binary
 - soil: top 16 rows of earth + bottom 27 rows of pebbles = 43 rows, which is the 86 px soil band at 2x
-Also: half-size "-s" icons and creature minis, lamp-off and firefly-day colour variants, rooms padded to 320x180,
+Also: half-size "-s" icons and creature minis, a firefly-day colour variant, the room lamp's bulb (on/off) cut from
+the room art itself (so the switchable lamp is the room's own lamp), rooms padded to 320x180,
 and assets/px/manifest.json refreshed. Run on a fresh make_pixel.py output (halving is not idempotent).
 
 python3 tools/px_fit.py
@@ -58,6 +59,26 @@ def recolor(name, out, test, to):
     print(f"{out}.png ({int(m.sum())} px repainted)")
 
 
+# the bulb under the room lamp's shade in bg-day (art pixels): per row, the first and last x inside its outline
+BULB = {55: [(22, 23), (32, 33)], 56: [(22, 33)], 57: [(23, 33)], 58: [(23, 32)], 59: [(24, 31)], 60: [(26, 30)]}
+
+
+def bulbs():
+    """bulb-on / bulb-off: the room's bulb pixels repainted lit (warm yellows) or dark (greys), drawn over the room."""
+    bg = np.asarray(Image.open(PX / "bg-day.png").convert("RGB")).astype(int)
+    x0, y0 = 22, 55
+    for out, ramp in [("bulb-on", [(245, 196, 66), (255, 222, 102), (255, 240, 160)]),
+                      ("bulb-off", [(150, 142, 128), (176, 168, 152), (198, 190, 174)])]:
+        a = np.zeros((6, 12, 4), np.uint8)
+        for y, spans in BULB.items():
+            for lo, hi in spans:
+                for x in range(lo, hi + 1):
+                    lum = bg[y, x].sum()
+                    a[y - y0, x - x0] = (*ramp[0 if lum < 700 else 1 if lum < 735 else 2], 255)
+        Image.fromarray(a, "RGBA").save(PX / f"{out}.png")
+        print(f"{out}.png at art ({x0}, {y0})")
+
+
 def full_height(name, rows=180):
     """Rooms are 320x179; repeat the last row so they cover 720 px at exactly 4x."""
     im = Image.open(PX / f"{name}.png").convert("RGB")
@@ -85,10 +106,10 @@ if __name__ == "__main__":
         halve_to(f"icon-{n}", f"icon-{n}-s")
     for n in ["snail", "springtail", "fern", "mushroom", "firefly"]:
         halve_to(n, f"{n}-s")
-    # a switched-off lamp (grey bulb) and a firefly that is not glowing (pale tail, for daytime)
+    # a firefly that is not glowing (pale tail, for daytime)
     yellow = lambda r, g, b: (r > 200) & (g > 170) & (b < 150)
-    recolor("lamp", "lamp-off", yellow, (196, 186, 166))
     recolor("firefly", "firefly-day", yellow, (232, 220, 168))
     for n in ["bg-day", "bg-night", "title"]:
         full_height(n)
+    bulbs()
     manifest()

@@ -16,7 +16,7 @@ class NoteCard {
     this.head = label(scene, 16, 24, "", 21);
     this.count = label(scene, CARD.w - 16, 24, "", 15, MUTED, 1);
     const wrap = { fontFamily: FONT, color: COL.ink, wordWrap: { width: CARD.w - 32 }, lineSpacing: 1 };
-    this.ask = scene.add.text(16, 42, "", { ...wrap, fontSize: "18px" });
+    this.ask = scene.add.text(16, 42, "", { ...wrap, fontSize: readPx(18) + "px" });
     this.line = scene.add.text(16, 0, "", { ...wrap, fontSize: "15px", color: MUTED });
     this.viz = scene.add.graphics();
     this.icons = scene.add.container(0, 0);
@@ -65,9 +65,12 @@ class NoteCard {
     const { w } = CARD, h = this.h, b = this.bg.clear();
     b.fillStyle(COL.inkHex, 0.18).fillRoundedRect(4, 6, w, h, 18);
     b.fillStyle(COL.card).lineStyle(3, COL.inkHex).fillRoundedRect(0, 0, w, h, 18).strokeRoundedRect(0, 0, w, h, 18);
-    // speech tail down towards the neighbour
-    b.fillStyle(COL.card).fillTriangle(96, h - 2, 128, h - 2, 112, h + 22);
-    b.lineStyle(3, COL.inkHex).lineBetween(96, h, 112, h + 22).lineBetween(112, h + 22, 128, h);
+    // speech tail down towards the neighbour, in 2 px steps: ink rows, then the card colour over the border
+    const hw = (y, w0, len) => Math.max(0, Math.round(w0 * (len - y) / len / 2) * 2);
+    b.fillStyle(COL.inkHex);
+    for (let y = 0; y < 26; y += 2) b.fillRect(112 - hw(y, 20, 26) - 2, h + y, 2 * hw(y, 20, 26) + 4, 2);
+    b.fillStyle(COL.card);
+    for (let y = -4; y < 20; y += 2) b.fillRect(112 - hw(y + 4, 16, 24), h + y, 2 * hw(y + 4, 16, 24), 2);
   }
 
   buildIcons(g) {

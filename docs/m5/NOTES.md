@@ -44,7 +44,7 @@
 - **Aset baru** (dibikin pakai `tools/px_fit.py`, tanpa Flow):
   - ikon setengah ukuran (`-s`)
   - makhluk mini buat bayi, pakis muda, dan baris kartu
-  - lampu mati dengan bohlam abu
+  - bohlam nyala/mati yang dipotong dari gambar ruangan (lihat bagian berikutnya)
   - kunang-kunang siang yang ga nyala
   - ruangan 320x180, jadi strip 4 px di bawah layar ilang
 - **Di toples:**
@@ -67,5 +67,14 @@
   - Tombol Play goyang 4 px, bukan skala.
   - Cahaya sama percikan sekarang bertingkat per 4 px kayak cahaya pixel art.
   - Kanvas yang tampil lebih kecil dari 1280x720 piksel perangkat pakai smoothing, biar baris piksel ga ilang.
-- **Belum:** teks lebih gede di HP, segitiga panah coach, ekor kartu, lampu kode vs lampu ruangan.
+- **Belum:** semuanya udah dikerjain di bagian berikutnya.
 - **Tes:** sim, request 38, UI, sama Firefox + WebKit semuanya lolos. Cover, 5 screenshot, dan trailer direkam ulang.
+
+## Sisa QA + self-review (23 Okt)
+- **Teks di HP:** kalau kanvas tampil di bawah 70% ukuran aslinya (HP landscape kira-kira 54%), teks yang wajib dibaca naik dari 16 ke 24 px. Isinya pil coach, toast, tooltip, sama permintaan di kartu catatan. Tombol sama kartu toko tetap 16 px, soalnya tempatnya ga cukup.
+- **Panah coach sama ekor kartu** sekarang digambar per baris 2 px, ga lagi pakai garis miring yang halus.
+- **Lampu:** sekarang pakai lampu dari gambar ruangannya sendiri. Kode cuma ngegambar bohlamnya (nyala kuning atau mati abu), dipotong dari piksel ruangan, jadi bentuk sama warnanya pasti pas. Sprite `lamp` lama udah dihapus.
+- **Cahaya:** pitanya sekarang per piksel tekstur, jadi cahaya lampu yang diskala 6x punya tangga 6 px, bukan kotak 24 px.
+- **Alat:** `tools/cdp.mjs` ga crash lagi kalau Chrome masih nulis ke folder profil pas ditutup.
+- **Self-review:** seluruh diff sejak build pixel udah dibaca ulang (lapisan, bubble, crop, tooltip, kartu pos, tombol). Ga ada bug baru.
+- **Tes:** sim, request 38, UI, sama Firefox + WebKit semuanya lolos. Cover, shot, trailer, sama GIF direkam ulang.

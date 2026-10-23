@@ -13,7 +13,8 @@ export async function launch({ width = 1280, height = 720, scale = 1, mobile = f
   const port = 9300 + Math.floor(Math.random() * 500);
   const proc = spawn(CHROME, ["--headless=new", "--mute-audio", `--user-data-dir=${ud}`, `--remote-debugging-port=${port}`,
     ...(gpu ? ["--use-angle=metal", "--enable-gpu"] : ["--use-angle=swiftshader", "--enable-unsafe-swiftshader"]), "--hide-scrollbars", "about:blank"], { stdio: "ignore" });
-  const close = () => { proc.kill("SIGKILL"); rmSync(ud, { recursive: true, force: true }); };
+  // Chrome's helpers can still be writing into the profile for a moment after the kill: retry, never throw
+  const close = () => { proc.kill("SIGKILL"); try { rmSync(ud, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 }); } catch {} };
 
   let ws;
   for (let i = 0; i < 75 && !ws; i++) {
