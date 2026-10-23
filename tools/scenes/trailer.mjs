@@ -16,7 +16,7 @@ const photo = (id, js) => `(async () => { const s = jar, S = ${sc}; ${js}; for (
 export default async rec => {
   rec.sound("music-title", { bed: true, volume: 0.55 });
   await rec.wait(1.8);
-  await rec.click(381, 362, 0.4); rec.sound("click", { volume: 0.5 });
+  await rec.click(1060, 372, 0.4); rec.sound("click", { volume: 0.5 });
   await rec.until(`window.STATE === "jar"`, 4);
   rec.sound("music-day", { bed: true, volume: 0.5 });
   await rec.caption("A tiny living world in a jar");

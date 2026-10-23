@@ -1,7 +1,7 @@
 # Jar Garden
 
 Grow a tiny living world inside a glass jar. Moss, ferns, mushrooms, snails, springtails and fireflies keep each other alive, or don't.
-Made for the Game Gauntlet: SIM Jam (theme SIMULATION). Phaser 3.90, plain JS, runs in the browser.
+Made for the Game Gauntlet: SIM Jam (theme SIMULATION). Phaser 3.90, plain JS, runs in the browser. Cozy pixel art (style B, picked by Angel on Oct 23).
 
 ## Run
 Open `index.html` (Canvas on file://), or serve the folder for WebGL. `?mute` = no audio, `?seed=N` = fixed jar, `?play` = skip the title.
@@ -15,9 +15,14 @@ Open `index.html` (Canvas on file://), or serve the folder for WebGL. `?mute` = 
 - `node tools/test.mjs --http --audio` — the UI test over http in WebGL, with every sound run through a muted manager (`?mute&audiotest`).
 - `node tools/xbrowser/smoke.mjs` — Firefox + WebKit headless smoke test (one-time setup: `cd tools/xbrowser && npm i && npx playwright install firefox webkit`).
 
+## Art pipeline
+- `python3 tools/make_pixel.py` turns the Flow renders in `art/flow/pixel/` into true pixel-art PNGs in `assets/px/` (keyed, re-gridded, palette-limited), then `python3 tools/px_fit.py` fits the soil-life tufts and the soil band to the jar.
+- The room is shown at 4x, everything inside the jar at 2x. Font: Tiny5 (OFL, `assets/fonts/`).
+
 ## Layout
 - `src/sim.js` the simulation (rules in `docs/PLAN.md`)
 - `src/requests.js` the neighbour notes (goals, holds, unlocks, lose rule), `src/card.js` the note card and postcards
+- `src/pixel.js` the pixel look for code-drawn UI (stepped boxes and circles, whole-number sprite scales)
 - `src/coach.js` the 30-second onboarding, `src/fx.js` juice and sim tells, `src/audio.js` music beds and SFX, `src/title.js` the title
 - `src/game.js` the jar scene + UI
 - `docs/PLAN.md` milestones to the Nov 5 deadline, `docs/ONE-PAGER.md` the M3 game design

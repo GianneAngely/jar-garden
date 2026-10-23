@@ -21,16 +21,16 @@ const FX = {
 
   hearts(sc, x, y, n = 6, depth = 31) {
     for (let k = 0; k < n; k++) {
-      const a = -Math.PI / 2 + (k - (n - 1) / 2) * 0.45, h = sc.add.image(x, y, "icon-heart").setScale(0.05).setDepth(depth);
-      sc.tweens.add({ targets: h, x: x + Math.cos(a) * 90, y: y + Math.sin(a) * 90, scale: 0.16, alpha: { from: 1, to: 0 }, duration: 1100, delay: k * 50, ease: "Cubic.Out", onComplete: () => h.destroy() });
+      const a = -Math.PI / 2 + (k - (n - 1) / 2) * 0.45, h = sc.add.image(x, y, "icon-heart").setScale(1).setDepth(depth);
+      sc.tweens.add({ targets: h, x: x + Math.cos(a) * 90, y: y + Math.sin(a) * 90, scale: fitPx(sc, "icon-heart", 18), alpha: { from: 1, to: 0 }, duration: 1100, delay: k * 50, ease: "Cubic.Out", onComplete: () => h.destroy() });
     }
   },
 
   // stale air leaving the open jar: the visible cause of "Fresh air" rising
   airWisp(sc) {
     const x = JAR.x + 90 + Math.random() * (JAR.w - 180);
-    const w = sc.add.image(x, JAR.y + 70, "icon-air").setScale(0.16).setAlpha(0).setDepth(24).setTint(0xf4f8f6);
-    sc.tweens.add({ targets: w, y: JAR.y - 40 - Math.random() * 40, x: x + (Math.random() - 0.5) * 80, alpha: { from: 0.75, to: 0 }, scale: 0.26, duration: 1600, ease: "Sine.Out", onComplete: () => w.destroy() });
+    const w = sc.add.image(x, JAR.y + 70, "icon-air").setScale(fitPx(sc, "icon-air", 16)).setAlpha(0).setDepth(24).setTint(0xf4f8f6);
+    sc.tweens.add({ targets: w, y: JAR.y - 40 - Math.random() * 40, x: x + (Math.random() - 0.5) * 80, alpha: { from: 0.75, to: 0 }, duration: 1600, ease: "Sine.Out", onComplete: () => w.destroy() });
   },
 
   // mist settles as a soft blue haze

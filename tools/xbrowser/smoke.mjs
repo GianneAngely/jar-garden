@@ -30,7 +30,7 @@ for (const [name, type] of [["firefox", firefox], ["webkit", webkit]]) {
     const at = async (gx, gy) => page.evaluate(([x, y]) => { const r = game.canvas.getBoundingClientRect(); return [r.left + x * r.width / 1280, r.top + y * r.height / 720]; }, [gx, gy]);
     const tap = async (gx, gy) => { const [x, y] = await at(gx, gy); if (mobile) await page.touchscreen.tap(x, y); else await page.mouse.click(x, y); await page.waitForTimeout(250); };
     await page.screenshot({ path: join(out, `${name}-${label}-title.png`) });
-    await tap(381, 362);
+    await tap(1060, 372);
     check(await page.waitForFunction(() => window.STATE === "jar", null, { timeout: 10000 }).then(() => true, () => false), `${tag}: Play opens the jar`);
     if (label === "desktop") {
       // the onboarding with real clicks

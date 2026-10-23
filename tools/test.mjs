@@ -15,7 +15,7 @@ const url = process.argv.filter(a => !a.startsWith("-"))[2] || (server ? server.
 const outDir = process.argv.filter(a => !a.startsWith("-"))[3] || join(root, "dist", "shots");
 mkdirSync(outDir, { recursive: true });
 
-const cdp = await launch({ gpu: !!server });
+const cdp = await launch({ gpu: true }); // headless without a GPU draws the 4x pixel art at a few fps
 const { evaluate, waitFor, click, errors } = cdp;
 const shot = name => cdp.shot(join(outDir, name));
 const done = code => { cdp.close(); server?.close(); process.exit(code); };
@@ -29,7 +29,7 @@ await cdp.open(url);
 check(await waitFor(`window.STATE === "title"`), "title screen loads");
 await sleep(400);
 await shot("0-title.png");
-await click(381, 362);                 // Play
+await click(1060, 372);                // Play
 check(await waitFor(`window.STATE === "jar"`), "Play opens the jar");
 if (AUDIOTEST) check(await evaluate(`game.sound.mute === true && game.sound.volume === 0 && !!game.sound.context`), "audio test: sound runs but is muted at volume 0");
 else check(await evaluate(`!game.sound.context`), "silent (?mute)");
@@ -141,7 +141,7 @@ if (AUDIOTEST) check(await evaluate(`["music-day", "music-night"].includes(Audio
   await waitFor(`window.STATE === "title"`);
   await sleep(500);
   check(await evaluate(`game.scene.getScene("Title").children.list.some(o => o.list?.[1]?.text?.includes("Continue"))`), "title offers Continue");
-  await click(381, 362);
+  await click(1060, 372);
   check(await waitFor(`window.STATE === "jar" && jar.req.i === 1 && game.scene.getScene("Jar").speedBtn.visible`), "Continue brings the saved jar back (note 2, speed on)");
   await evaluate(`Save.clear()`);
 }

@@ -1,0 +1,142 @@
+{
+  "snail": {
+    "w": 50,
+    "h": 40,
+    "srcPixelSize": 4.3
+  },
+  "snail-sad": {
+    "w": 54,
+    "h": 37,
+    "srcPixelSize": 4.3
+  },
+  "springtail": {
+    "w": 37,
+    "h": 27,
+    "srcPixelSize": 4.3
+  },
+  "firefly": {
+    "w": 23,
+    "h": 26,
+    "srcPixelSize": 4.3
+  },
+  "fern": {
+    "w": 48,
+    "h": 53,
+    "srcPixelSize": 4.3
+  },
+  "mushroom": {
+    "w": 37,
+    "h": 37,
+    "srcPixelSize": 4.3
+  },
+  "moss": {
+    "w": 57,
+    "h": 35,
+    "srcPixelSize": 4.3
+  },
+  "leaves": {
+    "w": 55,
+    "h": 37,
+    "srcPixelSize": 4.3
+  },
+  "mould": {
+    "w": 55,
+    "h": 37,
+    "srcPixelSize": 4.3
+  },
+  "cork": {
+    "w": 73,
+    "h": 27,
+    "srcPixelSize": 4.3
+  },
+  "lamp": {
+    "w": 59,
+    "h": 55,
+    "srcPixelSize": 4.3
+  },
+  "soil": {
+    "w": 306,
+    "h": 66,
+    "srcPixelSize": 4.3
+  },
+  "icon-spray": {
+    "w": 28,
+    "h": 38,
+    "srcPixelSize": 5.65
+  },
+  "icon-bulb": {
+    "w": 27,
+    "h": 38,
+    "srcPixelSize": 5.65
+  },
+  "icon-lid": {
+    "w": 34,
+    "h": 23,
+    "srcPixelSize": 5.65
+  },
+  "icon-drop": {
+    "w": 24,
+    "h": 33,
+    "srcPixelSize": 5.65
+  },
+  "icon-seed": {
+    "w": 27,
+    "h": 29,
+    "srcPixelSize": 5.65
+  },
+  "icon-sprout": {
+    "w": 36,
+    "h": 32,
+    "srcPixelSize": 5.65
+  },
+  "icon-air": {
+    "w": 39,
+    "h": 34,
+    "srcPixelSize": 5.65
+  },
+  "icon-heart": {
+    "w": 34,
+    "h": 31,
+    "srcPixelSize": 5.65
+  },
+  "hedgehog": {
+    "w": 74,
+    "h": 89,
+    "srcPixelSize": 4.3
+  },
+  "mole": {
+    "w": 74,
+    "h": 101,
+    "srcPixelSize": 4.3
+  },
+  "owl": {
+    "w": 70,
+    "h": 93,
+    "srcPixelSize": 4.3
+  },
+  "frog": {
+    "w": 73,
+    "h": 121,
+    "srcPixelSize": 4.3
+  },
+  "logo": {
+    "w": 202,
+    "h": 50,
+    "srcPixelSize": 5.8
+  },
+  "bg-day": {
+    "w": 320,
+    "h": 179,
+    "srcPixelSize": 4.3
+  },
+  "bg-night": {
+    "w": 320,
+    "h": 179,
+    "srcPixelSize": 4.3
+  },
+  "title": {
+    "w": 320,
+    "h": 179,
+    "srcPixelSize": 4.3
+  }
+}

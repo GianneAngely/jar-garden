@@ -7,9 +7,11 @@ const SPRITES = ["snail", "snail-sad", "springtail", "firefly", "fern", "mushroo
 const ICONS = ["spray", "bulb", "lid", "drop", "seed", "sprout", "air", "heart"];
 
 // creature sprite: display scale + origin. Ground creatures stand on the soil (origin bottom).
+// in the jar one art pixel is 2 screen pixels (the creature sprites are twice as detailed as the room)
+const JAR_PX = 2;
 const LOOK = {
-  snail: { s: 0.3, oy: 1 }, springtail: { s: 0.3, oy: 1 }, firefly: { s: 0.3, oy: 0.5 },
-  fern: { s: 0.55, oy: 0.97 }, mushroom: { s: 0.36, oy: 0.98 },
+  snail: { s: JAR_PX, oy: 1 }, springtail: { s: 1, oy: 1 }, firefly: { s: JAR_PX, oy: 0.5 }, // springtails are tiny
+  fern: { s: JAR_PX, oy: 0.97 }, mushroom: { s: JAR_PX, oy: 0.98 },
 };
 const WHY_ICON = {
   "too dry": "drop", "stuffy air": "air", "can't breathe": "air", "hungry": "leaves", "nothing to eat": "leaves",
@@ -56,7 +58,7 @@ function button(scene, x, y, w, h, str, icon, onTap) {
   };
   paint(false);
   c.add([bg, t]);
-  if (icon) c.add(scene.add.image(-w / 2 + 22, 0, "icon-" + icon).setScale(26 / 96));
+  if (icon) c.add(scene.add.image(-w / 2 + 22, 0, "icon-" + icon).setScale(fitPx(scene, "icon-" + icon, 26)));
   c.setSize(w, h).setInteractive({ useHandCursor: true })
     .on("pointerdown", () => c.setScale(0.95))
     .on("pointerout", () => c.setScale(1))
@@ -74,13 +76,10 @@ class Boot extends Phaser.Scene {
     this.load.on("progress", p => g.clear().fillStyle(0xe6d5bf).fillRoundedRect(W / 2 - 160, H / 2, 320, 18, 9).fillStyle(0x9fd08a).fillRoundedRect(W / 2 - 160, H / 2, Math.max(18, 320 * p), 18, 9).lineStyle(3, COL.inkHex).strokeRoundedRect(W / 2 - 160, H / 2, 320, 18, 9));
     this.load.once("complete", () => { g.destroy(); t.destroy(); });
     document.getElementById("boot")?.remove(); // the plain-HTML "Growing the jar..." shown while Phaser itself downloads
-    for (const k of SPRITES) this.load.image(k, `assets/${k}.webp`);
-    for (const k of ICONS) this.load.image("icon-" + k, `assets/icon-${k}.webp`);
+    for (const k of SPRITES) this.load.image(k, `assets/px/${k}.png`);
+    for (const k of ICONS) this.load.image("icon-" + k, `assets/px/icon-${k}.png`);
     Audio.load(this);
-    this.load.image("bg-day", "assets/bg-day.jpg");
-    this.load.image("bg-night", "assets/bg-night.jpg");
-    this.load.image("title", "assets/title.jpg");
-    this.load.image("logo", "assets/logo.webp");
+    for (const k of ["bg-day", "bg-night", "title", "logo"]) this.load.image(k, `assets/px/${k}.png`);
   }
   create() {
     Audio.apply(this.game);
@@ -89,7 +88,7 @@ class Boot extends Phaser.Scene {
     const grd = ctx.createRadialGradient(64, 64, 0, 64, 64, 64);
     grd.addColorStop(0, "rgba(255,255,255,1)"); grd.addColorStop(0.35, "rgba(255,255,255,0.45)"); grd.addColorStop(1, "rgba(255,255,255,0)");
     ctx.fillStyle = grd; ctx.fillRect(0, 0, 128, 128); t.refresh();
-    document.fonts.load("600 22px Fredoka").finally(() => this.scene.start(QS.has("play") ? "Jar" : "Title"));
+    document.fonts.load("16px Tiny5").finally(() => this.scene.start(QS.has("play") ? "Jar" : "Title"));
   }
 }
 
@@ -113,15 +112,15 @@ class Jar extends Phaser.Scene {
     this.selected = null;
     this.views = new Map();
 
-    this.add.image(0, 0, "bg-day").setOrigin(0).setDisplaySize(W, H);
-    this.bgNight = this.add.image(0, 0, "bg-night").setOrigin(0).setDisplaySize(W, H).setAlpha(0);
+    this.add.image(0, 0, "bg-day").setOrigin(0).setScale(PX);
+    this.bgNight = this.add.image(0, 0, "bg-night").setOrigin(0).setScale(PX).setAlpha(0);
     this.jarBack = this.add.graphics();
     this.drawJarBack();
 
     // soil band, clipped to the jar's rounded bottom
     const mask = this.make.graphics({ add: false }).fillRoundedRect(JAR.x + 3, JAR.y + 40, JAR.w - 6, JAR.h - 43, 44);
     const soilImg = this.add.image(JAR.x + JAR.w / 2, JAR.soil - 4, "soil").setOrigin(0.5, 0);
-    soilImg.setDisplaySize(JAR.w + 30, JAR.y + JAR.h - JAR.soil + 10).setMask(mask.createGeometryMask());
+    soilImg.setScale(JAR_PX).setMask(mask.createGeometryMask());
 
     // per-slot soil life: leftovers, moss, mould (pooled images, scaled each frame)
     // drawn in layers: every moss tuft first, then leftovers and mould on top, so a leaf pile or a mould patch
@@ -132,8 +131,9 @@ class Jar extends Phaser.Scene {
     this.slotViews.forEach((v, i) => { v.mould = this.add.image(at(i).x, JAR.soil + 6, "mould").setOrigin(0.5, 1).setFlipX(!at(i).flip).setVisible(false); });
     this.ents = this.add.layer();
     this.night = this.add.rectangle(0, 0, W, H, COL.night, 0).setOrigin(0);
-    this.lamp = this.add.image(JAR.x - 10, 0, "lamp").setOrigin(0.5, 0).setScale(0.5);
-    this.lampGlow = this.add.image(this.lamp.x, 122, "glow").setScale(6).setTint(0xffd27a).setBlendMode(Phaser.BlendModes.ADD).setAlpha(0);
+    // the lamp hangs where the room art has its own lamp (covering it), so the room's lamp is the one you switch
+    this.lamp = this.add.image(112, 52, "lamp").setOrigin(0.5, 0).setScale(PX);
+    this.lampGlow = this.add.image(this.lamp.x, 270, "glow").setScale(6).setTint(0xffd27a).setBlendMode(Phaser.BlendModes.ADD).setAlpha(0);
     this.glows = this.add.layer();
     this.jarFront = this.add.graphics();
     this.drawJarFront();
@@ -149,7 +149,7 @@ class Jar extends Phaser.Scene {
     this.jarFront = this.bake(this.jarFront, "jar-front");
     this.haze = this.bake(this.haze, "jar-haze");
     this.dew = this.bake(this.dew, "jar-dew");
-    this.lid = this.add.image(JAR.x + JAR.w / 2, JAR.y + 22, "cork").setOrigin(0.5, 1).setDisplaySize(JAR.w - 112, 46);
+    this.lid = this.add.image(JAR.x + JAR.w / 2, JAR.y + 22, "cork").setOrigin(0.5, 1).setScale(PX);
     this.lidHome = { x: this.lid.x, y: this.lid.y };
 
     this.buildToolbar();
@@ -200,21 +200,17 @@ class Jar extends Phaser.Scene {
   }
 
   drawJarFront() {
-    const f = this.jarFront, { x, y, w, h } = JAR, ink = 0x7a5a44;
-    // body outline, open between the neck walls
-    const r = 46, top = y + 40, bot = y + h, R = x + w;
-    f.lineStyle(4, ink).beginPath();
-    f.moveTo(x + 60, top); f.lineTo(x + r, top);
-    f.arc(x + r, top + r, r, -Math.PI / 2, Math.PI, true); f.lineTo(x, bot - r);
-    f.arc(x + r, bot - r, r, Math.PI, Math.PI / 2, true); f.lineTo(R - r, bot);
-    f.arc(R - r, bot - r, r, Math.PI / 2, 0, true); f.lineTo(R, top + r);
-    f.arc(R - r, top + r, r, 0, -Math.PI / 2, true); f.lineTo(R - 60, top);
-    f.strokePath();
-    f.lineStyle(4, ink).lineBetween(x + 60, y, x + 60, y + 42).lineBetween(x + w - 60, y, x + w - 60, y + 42);
-    f.lineStyle(3, ink).strokeRoundedRect(x + 52, y - 6, w - 104, 14, 6);
-    f.lineStyle(9, 0xffffff, 0.4).lineBetween(x + 26, y + 100, x + 26, y + 270);
-    f.lineStyle(5, 0xffffff, 0.3).lineBetween(x + 26, y + 292, x + 26, y + 322);
-    f.lineStyle(4, 0xffffff, 0.3).lineBetween(x + w - 30, y + 120, x + w - 30, y + 170);
+    const f = this.jarFront, { x, y, w, h } = JAR, ink = 0x5e3d2e;
+    // stepped pixel outline, open between the neck walls; a light rim inside it like the style reference's glass
+    f.fillStyle(0xd8eef0, 0.9);
+    pxOutline(f, x + 4, y + 44, w - 8, h - 48, 42, 4, [x + 60, x + w - 60]);
+    f.fillStyle(ink);
+    pxOutline(f, x, y + 40, w, h - 40, 46, 4, [x + 64, x + w - 64]);
+    f.fillRect(x + 60, y, 4, 44).fillRect(x + w - 64, y, 4, 44);
+    f.lineStyle(4, ink).fillStyle(0xd8eef0, 0.9).fillRoundedRect(x + 52, y - 8, w - 104, 16, 6).strokeRoundedRect(x + 52, y - 8, w - 104, 16, 6);
+    // glass glints: chunky pixel streaks
+    f.fillStyle(0xffffff, 0.5).fillRect(x + 20, y + 100, 8, 168).fillRect(x + 20, y + 288, 8, 32);
+    f.fillStyle(0xffffff, 0.35).fillRect(x + w - 32, y + 120, 4, 52);
   }
 
   // UI -----------------------------------------------------------------------
@@ -241,8 +237,8 @@ class Jar extends Phaser.Scene {
     this.bake(g, "panel-bg");
     this.barGlow = this.add.graphics(); // the coach's highlight, under the bars
     this.dayText = label(this, 792, 56, "", 28);
-    this.add.image(SEED_AT.x, SEED_AT.y, "icon-seed").setScale(30 / 96);
-    this.seedText = label(this, SEED_AT.x + 20, 56, "", 26, COL.ink, 0);
+    this.add.image(SEED_AT.x, SEED_AT.y, "icon-seed").setScale(fitPx(this, "icon-seed", 30));
+    this.seedText = label(this, SEED_AT.x + 20, 56, "", 30, COL.ink, 0);
     // "?": the jar guide (every species' needs and what the bubbles mean)
     const help = this.add.graphics().fillStyle(COL.card).lineStyle(2.5, COL.inkHex).fillCircle(1178, 56, 18).strokeCircle(1178, 56, 18);
     label(this, 1178, 55, "?", 22, COL.ink, 0.5);
@@ -283,7 +279,7 @@ class Jar extends Phaser.Scene {
       const c = this.add.container(cx, cy);
       const bg = this.add.graphics();
       const tex = this.textures.get(kind).getSourceImage();
-      const icon = this.add.image(-44, 2, kind).setScale(Math.min(56 / tex.width, 54 / tex.height));
+      const icon = this.add.image(-44, 2, kind).setScale(Math.max(1, Math.floor(Math.min(56 / tex.width, 54 / tex.height))));
       const name = label(this, -12, -12, Sim.KINDS[kind].name, 17);
       const n = Sim.KINDS[kind].cost;
       const cost = label(this, -12, 14, n + (n === 1 ? " seed" : " seeds"), 15, "#7a5a48");
@@ -330,7 +326,7 @@ class Jar extends Phaser.Scene {
 
   puff() {
     for (let k = 0; k < 10; k++) {
-      const d = this.add.image(JAR.x + 60 + Math.random() * (JAR.w - 120), JAR.y + 70, "icon-drop").setScale(0.12).setAlpha(0.9).setDepth(40);
+      const d = this.add.image(JAR.x + 60 + Math.random() * (JAR.w - 120), JAR.y + 70, "icon-drop").setScale(fitPx(this, "icon-drop", 12)).setAlpha(0.9).setDepth(40);
       this.tweens.add({ targets: d, y: JAR.y + 140 + Math.random() * 220, alpha: 0, duration: 900 + Math.random() * 500, onComplete: () => d.destroy() });
     }
   }
@@ -476,7 +472,7 @@ class Jar extends Phaser.Scene {
   leafFall() {
     Req.PILES.forEach((slot, i) => {
       for (let k = 0; k < 2; k++) {
-        const lf = this.add.image(JAR.x + JAR.w / 2 + (hash(i, k) - 0.5) * 120, JAR.y + 20, "leaves").setScale(0.22).setDepth(25).setAngle(hash(k, i) * 360);
+        const lf = this.add.image(JAR.x + JAR.w / 2 + (hash(i, k) - 0.5) * 120, JAR.y + 20, "leaves").setScale(JAR_PX).setDepth(25).setAngle(hash(k, i) * 360);
         this.tweens.add({ targets: lf, x: jx(Sim.slotX(slot)), y: JAR.soil - 4, angle: lf.angle + 200, duration: 1100 + hash(i, k + 3) * 500, delay: i * 120 + k * 200,
           ease: "Sine.In", onComplete: () => this.tweens.add({ targets: lf, alpha: 0, duration: 300, onComplete: () => lf.destroy() }) });
       }
@@ -514,12 +510,12 @@ class Jar extends Phaser.Scene {
     this.bumpSeeds(0);
     at.forEach(([x, y], i) => {
       this.pendingSeeds++;
-      const sd = this.add.image(x, y, "icon-seed").setScale(0.24).setDepth(55).setAlpha(0);
+      const sd = this.add.image(x, y, "icon-seed").setScale(fitPx(this, "icon-seed", 22)).setDepth(55).setAlpha(0);
       const plus = label(this, x + 30, y - 40, "+1", 18, "#fff8ef", 0.5).setStroke(COL.ink, 4).setDepth(55).setAlpha(0);
       this.tweens.add({ targets: plus, alpha: 1, y: y - 56, duration: 380, delay: i * 160, yoyo: true, hold: 300 });
       this.tweens.chain({ targets: sd, tweens: [
-        { alpha: 1, y: y - 36, scale: 0.34, duration: 380, delay: i * 160, ease: "Back.Out" },
-        { x: SEED_AT.x, y: SEED_AT.y, scale: 0.2, duration: 650, delay: 200, ease: "Cubic.In", onComplete: () => { sd.destroy(); plus.destroy(); this.bumpSeeds(); } },
+        { alpha: 1, y: y - 36, duration: 380, delay: i * 160, ease: "Back.Out" },
+        { x: SEED_AT.x, y: SEED_AT.y, duration: 650, delay: 200, ease: "Cubic.In", onComplete: () => { sd.destroy(); plus.destroy(); this.bumpSeeds(); } },
       ] });
     });
     for (const e of s.ents.filter(o => o.mood === "sad" && Sim.ANIMALS.includes(o.kind)).slice(0, 3)) {
@@ -665,7 +661,7 @@ class Jar extends Phaser.Scene {
     this.night.setFillStyle(COL.night, Math.min(0.8, dusk * (s.lamp ? 0.38 : 0.5) + this.dim));
     const shade = Phaser.Display.Color.Interpolate.ColorWithColor({ r: 255, g: 255, b: 255 }, { r: 140, g: 150, b: 190 }, 1, s.lamp ? dusk * 0.5 : dusk);
     const tint = Phaser.Display.Color.GetColor(shade.r, shade.g, shade.b);
-    this.lid.setTint(tint); this.lamp.setTint(tint); this.card.people.each(im => im.setTint(tint));
+    this.lid.setTint(tint); this.lamp.setTint(s.lamp ? tint : 0x8c90a8); this.card.people.each(im => im.setTint(tint));
     this.haze.setAlpha(Phaser.Math.Clamp((45 - s.air) / 45, 0, 1) * 0.45);
     this.dew.setAlpha(Phaser.Math.Clamp((s.hum - 85) / 12, 0, 1));
     if (s.lid && time > this.nextWisp) { FX.airWisp(this); this.nextWisp = time + 240; }
@@ -691,17 +687,16 @@ class Jar extends Phaser.Scene {
   }
 
   drawSoil(time) {
-    const sw = (JAR.w - 52) / Sim.N;
     this.s.slots.forEach((sl, i) => {
       const v = this.slotViews[i];
-      v.leaves.setVisible(sl.det > 0.05).setScale(0.14 + sl.det * 0.34);
+      v.leaves.setVisible(sl.det > 0.05).setScale(pxStep(JAR_PX * (0.6 + sl.det)));
       const m = sl.moss;
       if (m > 0.02 && this.prevMoss[i] <= 0.02) FX.sparkle(this, v.moss.x, JAR.soil - 8, 4, 0xd6f0a8, 22); // moss spread here
       this.prevMoss[i] = m;
       v.moss.setVisible(m > 0.01);
-      if (m > 0.01) v.moss.setScale((sw * (2 + m * 1.8)) / 220, 0.16 + m * 0.5 + Math.sin(time / 900 + i) * 0.006).setAlpha(0.75 + m * 0.25);
+      if (m > 0.01) v.moss.setScale(pxStep(JAR_PX * (0.8 + m * 0.7)), pxStep(JAR_PX * (0.4 + m))).setAlpha(m < 0.15 ? 0.7 : 1);
       v.mould.setVisible(sl.mould > 0.02);
-      if (sl.mould > 0.02) v.mould.setScale((sw * (1.6 + sl.mould * 3)) / 200, 0.18 + sl.mould * 0.5);
+      if (sl.mould > 0.02) v.mould.setScale(pxStep(JAR_PX * (0.7 + sl.mould)), pxStep(JAR_PX * (0.5 + sl.mould)));
     });
   }
 
@@ -764,10 +759,10 @@ class Jar extends Phaser.Scene {
         if (icon) {
           const key = icon === "leaves" ? "leaves" : "icon-" + icon;
           const src = this.textures.get(key).getSourceImage();
-          v.bubbleIcon.setTexture(key).setScale(20 / Math.max(src.width, src.height));
+          v.bubbleIcon.setTexture(key).setScale(fitPx(this, key, 20));
         }
       }
-      if (icon) v.bubble.setY((e.kind === "fern" ? -125 : e.kind === "firefly" ? -34 : -66) + Math.sin(time / 400) * 3);
+      if (icon) v.bubble.setY(-v.img.displayHeight * look.oy - 20 + Math.sin(time / 400) * 3);
       if (this.tipFor === e.id && this.tip.visible) {
         if (this.time.now > this.tipUntil) this.tip.setVisible(false);
         else this.showTip(e, v.c.x, v.c.y);

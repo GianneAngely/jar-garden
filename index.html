@@ -4,16 +4,16 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
 <title>Jar Garden</title>
-<link rel="stylesheet" href="assets/fonts/fredoka.css">
+<link rel="stylesheet" href="assets/fonts/tiny5.css">
 <style>
   html, body { margin: 0; height: 100%; background: #efe2d0; overflow: hidden; }
   body { touch-action: none; -webkit-user-select: none; user-select: none; -webkit-tap-highlight-color: transparent; }
   #game { position: fixed; inset: 0; }
   canvas { display: block; }
   /* shown while phaser.min.js downloads; Boot removes it */
-  #boot { position: fixed; inset: 0; display: flex; align-items: center; justify-content: center; font: 600 26px Fredoka, sans-serif; color: #6b4a3a; }
+  #boot { position: fixed; inset: 0; display: flex; align-items: center; justify-content: center; font: 24px Tiny5, monospace; color: #6b4a3a; }
   /* phones held upright get a "turn me" card: the jar is a landscape game */
-  #rotate { display: none; position: fixed; inset: 0; z-index: 10; background: #efe2d0; color: #6b4a3a; font: 600 24px Fredoka, sans-serif;
+  #rotate { display: none; position: fixed; inset: 0; z-index: 10; background: #efe2d0; color: #6b4a3a; font: 24px Tiny5, monospace;
     flex-direction: column; align-items: center; justify-content: center; gap: 22px; text-align: center; padding: 30px; }
   #rotate .phone { width: 54px; height: 92px; border: 5px solid #6b4a3a; border-radius: 12px; animation: turn 2.4s ease-in-out infinite; }
   @keyframes turn { 0%, 30% { transform: rotate(0deg); } 60%, 100% { transform: rotate(-90deg); } }
@@ -24,6 +24,7 @@
 <div id="game"><div id="boot">Growing the jar...</div></div>
 <div id="rotate"><div class="phone"></div>Turn your phone sideways<br>to play Jar Garden</div>
 <script src="lib/phaser.min.js"></script>
+<script src="src/pixel.js"></script>
 <script src="src/sim.js"></script>
 <script src="src/requests.js"></script>
 <script src="src/config.js"></script>

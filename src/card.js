@@ -1,8 +1,7 @@
 // Neighbour note card on the left windowsill: who asks, what, live progress, the reward. Drawn in code next to
 // the Flow portraits. refresh() runs every frame but only re-lays out when the note changes.
 const WHO = { hazel: "hedgehog", mole: "mole", owl: "owl", frog: "frog" };
-const CARD = { x: 12, y: 132, w: 256 };
-const PORTRAIT_H = 236;
+const CARD = { x: 12, y: 284, w: 256 }; // below the room's hanging lamp
 const MUTED = "#9a7a66";
 const UNLOCK_NAME = { speed: "Speed button", springtail: "Springtail", mushroom: "Mushroom", fern: "Fern" };
 
@@ -22,7 +21,7 @@ class NoteCard {
     this.status = label(scene, 16, 0, "", 15);
     this.chipBg = scene.add.graphics();
     this.chipText = label(scene, 0, 0, "", 14, COL.ink, 0.5);
-    this.seedIcon = scene.add.image(26, 0, "icon-seed").setScale(20 / 96);
+    this.seedIcon = scene.add.image(26, 0, "icon-seed").setScale(fitPx(scene, "icon-seed", 20));
     this.rewardText = label(scene, 42, 0, "", 15);
     this.box.add([this.bg, this.head, this.count, this.ask, this.line, this.viz, this.icons, this.status, this.chipBg, this.chipText, this.seedIcon, this.rewardText]);
     this.noteId = null;
@@ -74,14 +73,14 @@ class NoteCard {
     this.pipImgs = [];
     this.kindImgs = [];
     if (g.pips) for (let i = 0; i < g.pips.of; i++) {
-      const im = this.scene.add.image(28 + i * 40, this.rows.pips + 14, "firefly").setScale(0.17);
+      const im = this.scene.add.image(28 + i * 40, this.rows.pips + 14, "firefly").setScale(fitPx(this.scene, "firefly", 30));
       const glow = this.scene.add.image(im.x - 6, im.y + 3, "glow").setScale(0.42).setTint(0xffe680).setBlendMode(Phaser.BlendModes.ADD);
       this.icons.add([glow, im]);
       this.pipImgs.push({ im, glow });
     }
     if (g.icons) g.icons.forEach((k, i) => {
       const tex = this.scene.textures.get(k.key).getSourceImage();
-      const im = this.scene.add.image(30 + i * 38, this.rows.icons + 16, k.key).setScale(30 / Math.max(tex.width, tex.height));
+      const im = this.scene.add.image(30 + i * 38, this.rows.icons + 16, k.key).setScale(Math.max(1, Math.floor(30 / Math.max(tex.width, tex.height))));
       const sad = this.scene.add.circle(im.x + 12, im.y - 11, 5, 0xc8553d).setStrokeStyle(2, COL.inkHex);
       this.icons.add([im, sad]);
       this.kindImgs.push({ im, sad });
@@ -91,13 +90,12 @@ class NoteCard {
   buildPeople(who) {
     this.people.removeAll(true);
     const keys = who === "all" ? ["hedgehog", "mole", "owl", "frog"] : [WHO[who]];
-    const h = who === "all" ? 122 : PORTRAIT_H;
     keys.forEach((k, i) => {
-      const tex = this.scene.textures.get(k).getSourceImage();
       const x = who === "all" ? 44 + i * 58 : 124;
-      const im = this.scene.add.image(x, 724, k).setOrigin(0.5, 1).setScale(h / tex.height);
+      // one scale for all four (2x alone, 1x in the party lineup), so they keep the lineup art's sizes
+      const im = this.scene.add.image(x, 724, k).setOrigin(0.5, 1).setScale(who === "all" ? 1 : 2);
       this.people.add(im);
-      im.y += h + 20;
+      im.y += im.displayHeight + 20;
       this.scene.tweens.add({ targets: im, y: 724, duration: 520, delay: 120 + i * 90, ease: "Back.Out" });
     });
     this.box.setScale(0.85).setAlpha(0);
@@ -160,11 +158,11 @@ class NoteCard {
     this.chip("Thank you!", 0xcfe8c0);
     this.viz.fillStyle(0x9fd08a).fillRoundedRect(16, this.rows.bar, CARD.w - 32, 16, 8).lineStyle(2, COL.inkHex).strokeRoundedRect(16, this.rows.bar, CARD.w - 32, 16, 8);
     for (let k = 0; k < 8; k++) {
-      const a = (k / 8) * Math.PI * 2, h = sc.add.image(CARD.x + CARD.w / 2, CARD.y + this.h / 2, "icon-heart").setScale(0.18).setDepth(31);
+      const a = (k / 8) * Math.PI * 2, h = sc.add.image(CARD.x + CARD.w / 2, CARD.y + this.h / 2, "icon-heart").setScale(fitPx(sc, "icon-heart", 18)).setDepth(31);
       sc.tweens.add({ targets: h, x: h.x + Math.cos(a) * 150, y: h.y + Math.sin(a) * 120, scale: 0.08, alpha: 0, duration: 900, ease: "Cubic.Out", onComplete: () => h.destroy() });
     }
     for (let k = 0; k < note.reward; k++) {
-      const sd = sc.add.image(CARD.x + 26, CARD.y + this.seedIcon.y, "icon-seed").setScale(0.22).setDepth(55);
+      const sd = sc.add.image(CARD.x + 26, CARD.y + this.seedIcon.y, "icon-seed").setScale(fitPx(sc, "icon-seed", 22)).setDepth(55);
       sc.tweens.add({ targets: sd, x: SEED_AT.x, y: SEED_AT.y, duration: 700, delay: 300 + k * 110, ease: "Cubic.In", onComplete: () => { sd.destroy(); sc.bumpSeeds?.(); } });
     }
     this.people.each(im => sc.tweens.add({ targets: im, scaleY: im.scaleY * 1.08, scaleX: im.scaleX * 0.94, yoyo: true, repeat: 2, duration: 160 }));

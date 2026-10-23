@@ -3,7 +3,7 @@ export const http = true;
 export const query = "seed=7";
 export default async rec => {
   await rec.wait(2.2);
-  await rec.click(381, 362);                       // Play
+  await rec.click(1060, 372);                       // Play
   await rec.until(`window.STATE === "jar"`, 5);
   await rec.wait(0.8);
   // skip to a glowing firefly at night (onboarding is in m3b-onboarding.gif)
