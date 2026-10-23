@@ -16,7 +16,7 @@ Status: DRAFT. Nothing is uploaded or published. Angel submits herself (or appro
 - **Genre:** Simulation
 - **Tags:** simulation, cozy, ecosystem, terrarium, relaxing, cute, nature, sandbox, management, pastel
 - **AI generation disclosure (itch field):** Yes. Graphics, Code, Text (see the section below).
-- **Cover image:** `docs/m5/cover-*.png` (630 × 500, version A/B/C sent for Angel to pick)
+- **Cover image:** `docs/m5/cover.png` (630 × 500, pixel style B; `cover@2x.png` if itch asks for a bigger one)
 - **Screenshots:** `docs/m5/shots/` 1-first-glow, 2-moss-carpet, 3-light-show, 4-mould, 5-party (1280 × 720)
 - **Trailer:** `docs/m5/trailer.mp4` (29 s, 1280 × 720). Optional on the page via a YouTube link.
 

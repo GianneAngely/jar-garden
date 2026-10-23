@@ -661,7 +661,7 @@ class Jar extends Phaser.Scene {
     this.night.setFillStyle(COL.night, Math.min(0.8, dusk * (s.lamp ? 0.38 : 0.5) + this.dim));
     const shade = Phaser.Display.Color.Interpolate.ColorWithColor({ r: 255, g: 255, b: 255 }, { r: 140, g: 150, b: 190 }, 1, s.lamp ? dusk * 0.5 : dusk);
     const tint = Phaser.Display.Color.GetColor(shade.r, shade.g, shade.b);
-    this.lid.setTint(tint); this.lamp.setTint(s.lamp ? tint : 0x8c90a8); this.card.people.each(im => im.setTint(tint));
+    this.lid.setTint(tint); this.lamp.setTint(s.lamp ? tint : 0x6a6e88); this.card.people.each(im => im.setTint(tint));
     this.haze.setAlpha(Phaser.Math.Clamp((45 - s.air) / 45, 0, 1) * 0.45);
     this.dew.setAlpha(Phaser.Math.Clamp((s.hum - 85) / 12, 0, 1));
     if (s.lid && time > this.nextWisp) { FX.airWisp(this); this.nextWisp = time + 240; }
