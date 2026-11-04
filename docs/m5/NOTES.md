@@ -78,3 +78,14 @@
 - **Alat:** `tools/cdp.mjs` ga crash lagi kalau Chrome masih nulis ke folder profil pas ditutup.
 - **Self-review:** seluruh diff sejak build pixel udah dibaca ulang (lapisan, bubble, crop, tooltip, kartu pos, tombol). Ga ada bug baru.
 - **Tes:** sim, request 38, UI, sama Firefox + WebKit semuanya lolos. Cover, shot, trailer, sama GIF direkam ulang.
+
+## QA piksel final (4 Nov)
+Angel sempet nemu sendiri ikon toko yang ga center sama sprite lumut yang kepotong. Udah dibenerin manager di 64e54f9, ccbbb14, 1ab6079. Abis itu semua layar dicek ulang per piksel: judul, onboarding, 6 catatan siang/malam, gelembung, tooltip, panduan, kartu pos, menang, kalah, free play, plus ukuran HP 844x390 @3x dan laptop 1024x640.
+- **Sprite:** semua 45 PNG dicek tepinya. Selain lumut, ga ada yang kepotong: bola kunang-kunang simetris, dasar logo memang rata, alas makhluk tanah memang lurus.
+- **Tutup gabus vs label goal:** gabus yang dibuka nabrak bagian bawah label goal. Sekarang gabus cuma naik 30 px (sebelumnya 52) dan label pindah ke y 16–48.
+- **Ikon toko:** batas 42 px bikin skalanya pecahan (siput 0.75, pakis 0.75, kunang-kunang 1.5), jadi pikselnya ga rata. Sekarang skalanya bulat: siput, pakis, jamur, springtail, lumut 1x, kunang-kunang 2x. Posisinya tetap center pakai `opaqueBox` dari manager.
+- **Gelembung kebutuhan:** kalau makhluknya ngumpul, gelembungnya numpuk. Sekarang yang tumpang tindih didorong ke samping, tetap di dalam toples.
+- **Panduan:** pakis 2x (96x106) sama siput 2x (100x80) mepet ke tepi kotak dan teks. Sekarang kotaknya 124 px dan teks mulai di x+122.
+- **HP:** label goal ikut naik ke 24 px (`readPx`), masih muat di atas toples.
+- **Dibiarin:** panah coach waktu "Add a firefly!" nutupin teks kartu Fern yang masih terkunci (cuma pas onboarding). Kartu catatan di free play pada screenshot cuma artefak staging; di alur asli kartunya ilang abis pesta.
+- **Tes:** sim, request 38, UI file + http, Firefox + WebKit semuanya lolos.

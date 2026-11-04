@@ -26,6 +26,7 @@ const clock = day => {
   return `${(h + 11) % 12 + 1}:${String(m % 60).padStart(2, "0")} ${h < 12 ? "AM" : "PM"}`;
 };
 const SEED_AT = { x: 1060, y: 56 }; // the seed counter, where flying seeds land
+const LID_UP = 30; // the open cork lifts this far (and 110 right): its top stays below the goal pill
 const barY = i => 102 + i * 44; // panel bar rows (room under Humidity and Fresh air for their cause line)
 const FLUX_NAME = { lid: "open lid", plants: "plants", animals: "animals", mould: "mould", glass: "glass" };
 // show the bottom part (f of its rows) of a soil-life sprite: it grows up out of the soil without rescaling
@@ -204,7 +205,7 @@ class Jar extends Phaser.Scene {
     this.card = new NoteCard(this);
     // the game's goal, always on screen over the jar (Angel 4 Nov: "goalsnya apa")
     this.goalBg = this.add.graphics().setDepth(30);
-    this.goalText = label(this, 490, 38, "", 17, COL.ink, 0.5).setDepth(30);
+    this.goalText = label(this, 490, 32, "", readPx(17), COL.ink, 0.5).setDepth(30);
     this.coach = new Coach(this);
     this.showSpeed();
     this.thanks = [];
@@ -320,7 +321,7 @@ class Jar extends Phaser.Scene {
       const c = this.add.container(cx, cy);
       const bg = this.add.graphics();
       const tex = this.textures.get(kind).getSourceImage(), box = opaqueBox(tex); // sprites have uneven empty margins
-      const icon = this.add.image(0, 0, kind).setScale(Math.min(Math.max(1, Math.floor(Math.min(56 / tex.width, 54 / tex.height))), Math.floor(Math.min(42 / box.w, 42 / box.h) * PX) / PX)) // same size box for every icon, whole art pixels
+      const icon = this.add.image(0, 0, kind).setScale(Math.max(1, Math.floor(Math.min(56 / box.w, 54 / box.h)))) // whole scales: a 0.75 or 1.5 would resample the pixels
         .setOrigin((box.x + box.w / 2) / tex.width, (box.y + box.h / 2) / tex.height);
       const name = label(this, -12, -12, Sim.KINDS[kind].name, 17);
       const n = Sim.KINDS[kind].cost;
@@ -386,7 +387,7 @@ class Jar extends Phaser.Scene {
     this.lidBtn.setLabel(this.s.lid ? "Close lid" : "Open lid");
     this.lidBtn.setOn(this.s.lid);
     const { x, y } = this.lidHome;
-    this.tweens.add({ targets: this.lid, x: x + (this.s.lid ? 110 : 0), y: y - (this.s.lid ? 52 : 0), duration: 380, ease: "Back.Out" });
+    this.tweens.add({ targets: this.lid, x: x + (this.s.lid ? 110 : 0), y: y - (this.s.lid ? LID_UP : 0), duration: 380, ease: "Back.Out" });
   }
 
   toggleLamp() {
@@ -603,7 +604,7 @@ class Jar extends Phaser.Scene {
     const s = this.s;
     this.lidBtn.setLabel(s.lid ? "Close lid" : "Open lid");
     this.lidBtn.setOn(s.lid);
-    this.lid.setPosition(this.lidHome.x + (s.lid ? 110 : 0), this.lidHome.y - (s.lid ? 52 : 0));
+    this.lid.setPosition(this.lidHome.x + (s.lid ? 110 : 0), this.lidHome.y - (s.lid ? LID_UP : 0));
     this.lampBtn.setLabel(s.lamp ? "Lamp off" : "Lamp on"); // the action, like the lid button; yellow = lamp is on
     this.lampBtn.setOn(s.lamp);
     this.lampBtn.list[2].setAlpha(s.lamp ? 1 : 0.45);
@@ -815,6 +816,15 @@ class Jar extends Phaser.Scene {
         else this.showTip(e, v.c.x, v.c.y);
       }
     }
+    // bubbles of creatures standing close never stack: overlapping ones are nudged apart sideways, inside the jar
+    const bs = [...this.views.values()].filter(v => v.why).map(v => v.bubble);
+    for (let it = 0; it < 3; it++) for (let a = 0; a < bs.length; a++) for (let b = a + 1; b < bs.length; b++) {
+      const A = bs[a], B = bs[b], dx = B.x - A.x;
+      if (Math.abs(dx) >= 38 || Math.abs(B.y - A.y) >= 38) continue;
+      const push = (38 - Math.abs(dx)) / 2, side = dx >= 0 ? 1 : -1;
+      A.x -= side * push; B.x += side * push;
+    }
+    for (const b of bs) b.x = Math.round(Phaser.Math.Clamp(b.x, JAR.x + 26, JAR.x + JAR.w - 26) / 2) * 2;
     const flies = this.s.ents.filter(e => e.kind === "firefly").map(e => this.views.get(e.id)).filter(Boolean);
     for (let a = 0; a < flies.length; a++) for (let b = a + 1; b < flies.length; b++) {
       const A = flies[a].c, B = flies[b].c, dx = B.x - A.x, dy = B.y - A.y, d = Math.hypot(dx, dy) || 1;
@@ -878,9 +888,9 @@ class Jar extends Phaser.Scene {
     const goal = s.req.won ? "Party done! Free play" : pr ? `Goal: throw a firefly party · note ${Req.NOTES.indexOf(pr.note) + 1}/${Req.NOTES.length}` : "";
     if (goal !== this.goalText.text) {
       this.goalText.setText(goal);
-      const w = this.goalText.width + 28;
+      const w = this.goalText.width + 28, h = Math.max(32, this.goalText.height + 8);
       this.goalBg.clear();
-      if (goal) this.goalBg.fillStyle(COL.card).lineStyle(2.5, COL.inkHex).fillRoundedRect(490 - w / 2, 22, w, 32, 8).strokeRoundedRect(490 - w / 2, 22, w, 32, 8);
+      if (goal) this.goalBg.fillStyle(COL.card).lineStyle(2.5, COL.inkHex).fillRoundedRect(490 - w / 2, 32 - h / 2, w, h, 8).strokeRoundedRect(490 - w / 2, 32 - h / 2, w, h, 8);
     }
     for (const c of this.cards) c.paint();
   }

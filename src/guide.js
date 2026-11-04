@@ -18,10 +18,11 @@ function showGuide(sc) {
     label(sc, W / 2, 124, "Lid open: fresh air in, damp out. Lid shut: damp stays, and wet leftovers grow mould.", 18, "#7a5a48", 0.5)]);
   GUIDE.forEach(([key, name, need, gives, note], i) => {
     const x = 140 + (i % 2) * 510, y = 158 + Math.floor(i / 2) * 132;
-    const box = sc.add.graphics().fillStyle(0xfffdf8).lineStyle(2, COL.inkHex, 0.5).fillRoundedRect(x, y, 490, 118, 16).strokeRoundedRect(x, y, 490, 118, 16);
-    const icon = sc.add.image(x + 56, y + 59, key).setScale(2); // the jar's own 2x
-    o.add([box, icon, label(sc, x + 112, y + 24, name, 21),
-      label(sc, x + 112, y + 52, need, 16), label(sc, x + 112, y + 76, gives, 16, "#4f7a3e"), label(sc, x + 112, y + 99, note, 16, "#9a6a56")]);
+    // 124 tall with the text from x + 122: the 2x fern (96x106) and snail (100x80) keep a margin all round
+    const box = sc.add.graphics().fillStyle(0xfffdf8).lineStyle(2, COL.inkHex, 0.5).fillRoundedRect(x, y, 490, 124, 16).strokeRoundedRect(x, y, 490, 124, 16);
+    const icon = sc.add.image(x + 64, y + 62, key).setScale(2); // the jar's own 2x
+    o.add([box, icon, label(sc, x + 122, y + 27, name, 21),
+      label(sc, x + 122, y + 55, need, 16), label(sc, x + 122, y + 79, gives, 16, "#4f7a3e"), label(sc, x + 122, y + 102, note, 16, "#9a6a56")]);
   });
   const by = 572;
   o.add(label(sc, 140, by, "Bubbles over a creature say what it needs:", 17, "#7a5a48"));
