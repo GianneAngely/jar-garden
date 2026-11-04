@@ -16,13 +16,13 @@ The whole simulation is one pure function, `Sim.tick(state, dt)` in [`src/sim.js
 
 ```mermaid
 flowchart TB
-  you[You<br/>lid · lamp · mist · shop] --> env
+  you[You<br/>lid, lamp,<br/>mist, shop] --> env
   sun[Sun<br/>day/night cycle] --> env
-  env[Light · humidity · fresh air] --> soil[20 soil patches<br/>moss · mould · leftovers]
-  env --> life[Creatures<br/>needs · mood · health]
+  env[Light<br/>humidity<br/>fresh air] --> soil[20 soil patches<br/>moss, mould,<br/>leftovers]
+  env --> life[Creatures<br/>needs, mood,<br/>health]
   soil <--> life
   life --> env
-  life --> pay[Midnight payday<br/>+1 seed per happy species]
+  life --> pay[Midnight payday<br/>+1 seed per<br/>happy species]
   pay --> you
 ```
 
