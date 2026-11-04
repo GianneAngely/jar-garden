@@ -320,7 +320,7 @@ class Jar extends Phaser.Scene {
       const c = this.add.container(cx, cy);
       const bg = this.add.graphics();
       const tex = this.textures.get(kind).getSourceImage(), box = opaqueBox(tex); // sprites have uneven empty margins
-      const icon = this.add.image(-44, 2, kind).setScale(Math.min(Math.max(1, Math.floor(Math.min(56 / tex.width, 54 / tex.height))), Math.floor(Math.min(50 / box.w, 50 / box.h) * PX) / PX)) // fits inside the card, whole art pixels
+      const icon = this.add.image(0, 0, kind).setScale(Math.min(Math.max(1, Math.floor(Math.min(56 / tex.width, 54 / tex.height))), Math.floor(Math.min(42 / box.w, 42 / box.h) * PX) / PX)) // same size box for every icon, whole art pixels
         .setOrigin((box.x + box.w / 2) / tex.width, (box.y + box.h / 2) / tex.height);
       const name = label(this, -12, -12, Sim.KINDS[kind].name, 17);
       const n = Sim.KINDS[kind].cost;
@@ -329,6 +329,13 @@ class Jar extends Phaser.Scene {
       const unlockAt = Req.NOTES.findIndex(nt => nt.unlock === kind);
       const lock = label(this, -12, 14, `after note ${unlockAt + 1}`, 15, "#7a5a48");
       c.add(lock);
+      // icon + the shown text centred as one group: the same gap on the card's left and right
+      const iw = box.w * icon.scaleX;
+      const centre = open => {
+        const x0 = -(iw + 8 + Math.max(name.width, (open ? cost : lock).width)) / 2;
+        icon.x = Math.round(x0 + iw / 2);
+        for (const t of [name, cost, lock]) t.x = Math.round(x0 + iw + 8);
+      };
       c.setSize(146, 74).setInteractive({ useHandCursor: true }).on("pointerup", () => {
         if (!Req.canBuy(this.s, kind)) return this.say(`${Sim.KINDS[kind].name} comes with note ${unlockAt + 1}`);
         if (!this.coach.allows("shop:" + kind)) return this.coach.nudge();
@@ -341,7 +348,7 @@ class Jar extends Phaser.Scene {
         c.look = look;
         bg.clear().fillStyle(on ? 0xffe6a8 : open ? 0xfffdf8 : 0xf1e6d6).lineStyle(on ? 4 : 2, COL.inkHex, afford && open ? 1 : 0.35).fillRoundedRect(-73, -37, 146, 74, 14).strokeRoundedRect(-73, -37, 146, 74, 14);
         icon.setTint(open ? 0xffffff : 0x9a8a80);
-        cost.setVisible(open); lock.setVisible(!open);
+        cost.setVisible(open); lock.setVisible(!open); centre(open);
         c.setAlpha(open ? (afford ? 1 : 0.5) : 0.6);
       };
       return c;
