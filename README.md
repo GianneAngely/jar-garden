@@ -15,7 +15,7 @@ Made solo for **Game Gauntlet: SIM Jam** (theme SIMULATION), Oct 19 – Nov 4, 2
 The whole simulation is one pure function, `Sim.tick(state, dt)` in [`src/sim.js`](src/sim.js), with no Phaser inside, so Node can run it headless in the tests. One in-game day is 60 seconds at 1x and the game steps it about 120 times a day. Every step runs the same chain:
 
 ```mermaid
-flowchart LR
+flowchart TB
   you[You<br/>lid · lamp · mist · shop] --> env
   sun[Sun<br/>day/night cycle] --> env
   env[Light · humidity · fresh air] --> soil[20 soil patches<br/>moss · mould · leftovers]
