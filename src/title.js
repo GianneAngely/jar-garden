@@ -18,8 +18,10 @@ class Title extends Phaser.Scene {
     const logo = this.add.image(lx, 190, "logo").setScale(2);
     this.tweens.add({ targets: [logo], y: 184, yoyo: true, repeat: -1, duration: 2400, ease: "Sine.InOut" });
     const tg = this.add.graphics();
-    const tag = label(this, lx, 290, "a tiny living world in a jar", 18, COL.ink, 0.5);
-    tg.fillStyle(0xfff8ef, 0.9).fillRoundedRect(lx - tag.width / 2 - 14, 274, tag.width + 28, 32, 8);
+    const tag = label(this, lx, 284, "a tiny living world in a jar", 18, COL.ink, 0.5);
+    const goal = label(this, lx, 312, "Goal: help 6 neighbours, then throw a firefly party", 15, COL.ink, 0.5);
+    const tw = Math.max(tag.width, goal.width);
+    tg.fillStyle(0xfff8ef, 0.9).fillRoundedRect(lx - tw / 2 - 14, 266, tw + 28, 64, 8);
     // with a saved jar: Continue is the big button, "New jar" starts over
     const saved = Save.on && Save.load();
     const play = button(this, lx, 372, 210, 58, saved ? "▶  Continue" : "▶  Play", null, () => this.go(!!saved));

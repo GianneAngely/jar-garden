@@ -189,6 +189,9 @@ class Jar extends Phaser.Scene {
 
     Audio.loadBeds(this); // in case the title's background load was cut short by a quick Play
     this.card = new NoteCard(this);
+    // the game's goal, always on screen over the jar (Angel 4 Nov: "goalsnya apa")
+    this.goalBg = this.add.graphics().setDepth(30);
+    this.goalText = label(this, 490, 38, "", 17, COL.ink, 0.5).setDepth(30);
     this.coach = new Coach(this);
     this.showSpeed();
     this.thanks = [];
@@ -851,6 +854,13 @@ class Jar extends Phaser.Scene {
     const q = this.thanks[0]; // a finished note waiting for its thank-you stays on the card, full
     const pr = q ? { note: q, goal: q.goal(s), p: 1, paused: false } : Req.progress(s);
     if (pr) this.card.refresh(pr, Req.NOTES.indexOf(pr.note), Req.NOTES.length);
+    const goal = s.req.won ? "Party done! Free play" : pr ? `Goal: throw a firefly party · note ${Req.NOTES.indexOf(pr.note) + 1}/${Req.NOTES.length}` : "";
+    if (goal !== this.goalText.text) {
+      this.goalText.setText(goal);
+      const w = this.goalText.width + 28;
+      this.goalBg.clear();
+      if (goal) this.goalBg.fillStyle(COL.card).lineStyle(2.5, COL.inkHex).fillRoundedRect(490 - w / 2, 22, w, 32, 8).strokeRoundedRect(490 - w / 2, 22, w, 32, 8);
+    }
     for (const c of this.cards) c.paint();
   }
 
