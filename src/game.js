@@ -40,6 +40,19 @@ const hash = (a, b) => { const x = Math.sin(a * 127.1 + b * 311.7) * 43758.5453;
 // note's ask) go up one font step, 16 -> 24 px
 const readPx = size => (game.canvas.getBoundingClientRect().width < 0.7 * W ? 24 : size);
 
+// the drawn part of a sprite (alpha > 0), so shop icons centre on the art, not the canvas; whole image if unreadable
+function opaqueBox(img) {
+  const w = img.width, h = img.height, full = { x: 0, y: 0, w, h };
+  try {
+    const cv = document.createElement("canvas"); cv.width = w; cv.height = h;
+    const cx = cv.getContext("2d"); cx.drawImage(img, 0, 0);
+    const d = cx.getImageData(0, 0, w, h).data;
+    let x0 = w, y0 = h, x1 = -1, y1 = -1;
+    for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) if (d[(y * w + x) * 4 + 3]) { if (x < x0) x0 = x; if (x > x1) x1 = x; if (y < y0) y0 = y; if (y > y1) y1 = y; }
+    return x1 < 0 ? full : { x: x0, y: y0, w: x1 - x0 + 1, h: y1 - y0 + 1 };
+  } catch { return full; } // file:// pages can't read image pixels
+}
+
 function label(scene, x, y, str, size = 22, color = COL.ink, origin = 0) {
   return scene.add.text(x, y, str, { fontFamily: FONT, fontSize: size + "px", color }).setOrigin(origin, 0.5);
 }
@@ -306,8 +319,9 @@ class Jar extends Phaser.Scene {
       const cx = 855 + (i % 3) * 156, cy = 556 + Math.floor(i / 3) * 84;
       const c = this.add.container(cx, cy);
       const bg = this.add.graphics();
-      const tex = this.textures.get(kind).getSourceImage();
-      const icon = this.add.image(-44, 2, kind).setScale(Math.max(1, Math.floor(Math.min(56 / tex.width, 54 / tex.height))));
+      const tex = this.textures.get(kind).getSourceImage(), box = opaqueBox(tex); // sprites have uneven empty margins
+      const icon = this.add.image(-44, 2, kind).setScale(Math.min(Math.max(1, Math.floor(Math.min(56 / tex.width, 54 / tex.height))), Math.floor(Math.min(50 / box.w, 50 / box.h) * PX) / PX)) // fits inside the card, whole art pixels
+        .setOrigin((box.x + box.w / 2) / tex.width, (box.y + box.h / 2) / tex.height);
       const name = label(this, -12, -12, Sim.KINDS[kind].name, 17);
       const n = Sim.KINDS[kind].cost;
       const cost = label(this, -12, 14, n + (n === 1 ? " seed" : " seeds"), 15, "#7a5a48");
